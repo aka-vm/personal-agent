@@ -68,7 +68,10 @@ when you need details rather than asking Vineet for what's already documented.
   `python3 tools/wa.py text <name> "<msg>"`. Outbound only. info: `services/whatsapp/info.md`
 - **n8n** — workflow automation · info: `services/n8n/info.md`
 - **Karakeep** — bookmarks/read-later · local web UI on port 3000
-- **Browser (Playwright MCP)** — `mcp__playwright__*` tools for real web browsing
+- **Web search** — `python3 tools/brave.py search "<query>"` (Brave; fast, default
+  for looking things up) · info: `services/web/info.md`
+- **Browser (Playwright MCP)** — `mcp__playwright__*` for *interacting* with pages
+  (forms, login, JS scraping). Slow on the Pi — prefer Brave for plain search.
 
 ## Sending files
 To send a file/image back to Vineet, output a line anywhere in your reply:
