@@ -68,6 +68,15 @@ crontab -e
 0 8 * * * /usr/bin/python3 ~/agent/tasks/daily_briefing.py >> ~/agent/logs/briefing.log 2>&1
 ```
 
+## Optional integrations
+- **Linear / other claude.ai MCPs:** authenticate once via the Claude app or
+  `claude mcp` — they then work in the headless bot too.
+- **GitHub:** `sudo apt install gh` then `gh auth login` (PAT with `repo`,
+  `read:org`, `workflow`). The agent uses `gh` via Bash.
+- **Browser (Playwright):** run the Playwright MCP (Docker, port 3333), then
+  `claude mcp add --scope user --transport http playwright http://localhost:3333/mcp`.
+  Note: Chromium launch on a Pi is slow (~2-4 min/task) but within the turn limit.
+
 ## Notes
 - Secrets/config/memory/personal catalogs are gitignored — the repo stays clean
   to share. `*.example.*` files show the format.
