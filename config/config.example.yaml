@@ -1,0 +1,31 @@
+# Agent configuration — copy to ~/.config/agent/config.yaml and fill in.
+# This file holds NON-SECRET settings. Secrets go in ~/.config/agent/secrets.env.
+
+agent:
+  # Model the bot uses for each turn. Sonnet is the cost/speed sweet spot for a
+  # 24/7 assistant; switch to claude-opus-4-8 only if you need heavier reasoning.
+  model: "claude-sonnet-4-6"
+  # Working directory the `claude` CLI runs in. CLAUDE.md and memory are keyed
+  # to this path. Should be the repo root.
+  work_dir: "/home/vineet/agent"
+  # Per-turn timeout in seconds.
+  timeout: 600
+  # Reset a conversation after this many seconds of inactivity (0 = never).
+  session_timeout: 0
+
+telegram:
+  enabled: true
+  # Only this Telegram user ID may talk to the bot. Get yours from @userinfobot.
+  allowed_id: 000000000
+
+whatsapp:
+  enabled: true
+  bridge_url: "http://localhost:3001"
+  # Your own number (full access, like the Telegram owner).
+  owner_phone: "910000000000"
+  # Group where the agent posts replies + mirrors outbound messages.
+  log_group: "000000000000000000@g.us"
+
+paths:
+  # Runtime state (session ids, polling offsets). Outside the repo.
+  state_dir: "~/.config/agent/state"

@@ -1,0 +1,25 @@
+# Secrets and personal config live OUTSIDE the repo (~/.config/agent/).
+# Nothing personal should ever be committed. These rules are belt-and-suspenders.
+*.env
+!*.example.env
+config.yaml
+secrets.env
+*.local
+
+# Runtime state
+state/
+*.log
+*.pid
+__pycache__/
+*.pyc
+
+# OS
+.DS_Store
+logs/
+
+# Personal memory (template is committed as MEMORY.example.md)
+memory/MEMORY.md
+
+# Personal service catalogs (contain contacts' PII); only the example is committed
+services/*
+!services/EXAMPLE_service.md

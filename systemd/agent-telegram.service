@@ -1,0 +1,16 @@
+[Unit]
+Description=Personal Agent — Telegram adapter
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/vineet/agent
+ExecStart=/usr/bin/python3 -u /home/vineet/agent/adapters/telegram_bot.py
+Restart=always
+RestartSec=10
+StandardOutput=append:/home/vineet/agent/logs/telegram.log
+StandardError=append:/home/vineet/agent/logs/telegram.log
+
+[Install]
+WantedBy=default.target
