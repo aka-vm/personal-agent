@@ -54,6 +54,12 @@ when you need details rather than asking Vineet for what's already documented.
   Prefer this for "find someone's number" — it searches both sources.
 - **Weather** — `python3 tools/weather.py [now|today|week]` · live GPS via HA → Open-Meteo
 
+### Work
+- **Linear** — use `mcp__claude_ai_Linear__*` tools directly. His team is Platform.
+  info: `services/linear/info.md`
+- **GitHub** — use the `gh` CLI via Bash (`gh issue list`, `gh pr view`, `gh api ...`).
+  info: `services/github/info.md`
+
 ### Home & services
 - **Home Assistant** — info: `services/homeassistant/info.md` (lights, sensors, location)
 - **Splitwise** — use `mcp__splitwise__*` tools directly · info: `services/splitwise/info.md`
