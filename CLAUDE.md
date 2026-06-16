@@ -79,7 +79,8 @@ when you need details rather than asking Vineet for what's already documented.
   info: `services/github/info.md`
 
 ### Home & services
-- **Home Assistant** — info: `services/homeassistant/info.md` (lights, sensors, location)
+- **Home Assistant** — use `mcp__homeassistant__*` tools for LIVE device control
+  + state (lights, switches, sensors, climate). info: `services/homeassistant/info.md`
 - **Splitwise** — use `mcp__splitwise__*` tools directly · info: `services/splitwise/info.md`
 - **WhatsApp (text people on his behalf)** — to message someone:
   `python3 tools/wa.py resolve <name>` to find them, confirm with Vineet, then

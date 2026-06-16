@@ -16,6 +16,23 @@ telegram_net.install()  # survive ISP DNS poisoning of api.telegram.org
 
 _TOKEN = config.secret("TELEGRAM_BOT_TOKEN")
 _CHAT_ID = config.get("telegram.allowed_id")
+_WA_BRIDGE = config.get("whatsapp.bridge_url", "http://localhost:3001")
+_WA_GROUP = config.get("whatsapp.chat_group")
+
+
+def send_whatsapp(text: str) -> bool:
+    """Send to the RPI bot WhatsApp group (the active channel)."""
+    if not _WA_GROUP:
+        return False
+    body = json.dumps({"groupId": _WA_GROUP, "message": text}).encode()
+    req = urllib.request.Request(_WA_BRIDGE + "/send-group", data=body,
+                                 method="POST", headers={"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=20) as r:
+            return json.loads(r.read()).get("ok", False)
+    except Exception as e:
+        print(f"[notify] whatsapp send failed: {e}")
+        return False
 
 
 def _post(body) -> bool:
