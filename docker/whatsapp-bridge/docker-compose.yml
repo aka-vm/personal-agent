@@ -1,0 +1,11 @@
+services:
+  whatsapp:
+    build: .
+    image: wa-bridge:latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3001:3001"
+    volumes:
+      - /mnt/ssd/rpi_storage/whatsapp-baileys:/data
+      - /mnt/ssd/rpi_storage:/mnt/ssd/rpi_storage:ro
+      - /home/vineet:/home/vineet:ro

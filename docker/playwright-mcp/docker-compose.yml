@@ -1,0 +1,10 @@
+services:
+  playwright-mcp:
+    build: .
+    image: playwright-mcp:latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3333:3333"
+    environment:
+      - DISPLAY=:99
+    shm_size: 256m
