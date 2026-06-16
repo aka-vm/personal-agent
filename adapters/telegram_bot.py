@@ -12,6 +12,9 @@ import requests
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from core.agent import handle
 from core.config import config
+from core import telegram_net
+
+telegram_net.install()  # survive ISP DNS poisoning of api.telegram.org
 
 TOKEN = config.secret("TELEGRAM_BOT_TOKEN")
 ALLOWED_ID = int(config.get("telegram.allowed_id"))
