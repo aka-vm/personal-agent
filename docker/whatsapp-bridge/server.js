@@ -78,6 +78,19 @@ function saveTexted() {
 loadContacts()
 loadTexted()
 
+// Restore recent messages from disk so a restart doesn't drop the buffer.
+function loadMessages() {
+  if (!fs.existsSync(MESSAGES_FILE)) return
+  try {
+    const lines = fs.readFileSync(MESSAGES_FILE, 'utf8').trim().split('\n').filter(Boolean)
+    for (const line of lines.slice(-MAX_MESSAGES)) {
+      try { recentMessages.unshift(JSON.parse(line)) } catch {}
+    }
+    console.log(`[wa] Restored ${recentMessages.length} messages from disk`)
+  } catch (e) { console.log('[wa] loadMessages failed:', e.message) }
+}
+loadMessages()
+
 function jid(phone) {
   if (phone.includes('@')) return phone
   const digits = phone.replace(/\D/g, '')

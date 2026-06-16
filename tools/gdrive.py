@@ -6,6 +6,7 @@ Usage:
   gdrive.py search <personal|work> <query>
   gdrive.py upload <personal|work> <local_path> [folder_id]
   gdrive.py download <personal|work> <file_id> [dest_path]
+  gdrive.py read <personal|work> <file_id>     # read a Google Doc/Sheet as text
   gdrive.py share <personal|work> <file_id> <email> [viewer|editor]
   gdrive.py mkdir <personal|work> <name> [parent_folder_id]
   gdrive.py info <personal|work> <file_id>
@@ -143,6 +144,26 @@ def cmd_info(account, file_id):
     print(f"Shared:   {f.get('shared', False)}")
     print(f"Link:     {f.get('webViewLink','')}")
 
+def cmd_read(account, file_id):
+    """Read a Google Doc/Sheet/Slides as text (via Drive export; uses existing scope)."""
+    svc = get_service(account)
+    meta = svc.files().get(fileId=file_id, fields="name,mimeType").execute()
+    mime = meta["mimeType"]
+    export_as = {
+        "application/vnd.google-apps.document": "text/plain",
+        "application/vnd.google-apps.spreadsheet": "text/csv",
+        "application/vnd.google-apps.presentation": "text/plain",
+    }.get(mime)
+    print(f"\n── {meta['name']} ──")
+    if not export_as:
+        print(f"(Not a Google Doc/Sheet/Slides — {mime}. Use `download` instead.)")
+        return
+    data = svc.files().export(fileId=file_id, mimeType=export_as).execute()
+    text = data.decode("utf-8", errors="replace") if isinstance(data, (bytes, bytearray)) else str(data)
+    print(text[:6000])
+    if len(text) > 6000:
+        print(f"\n... ({len(text)-6000} more chars — refine or ask for a section)")
+
 USAGE = __doc__
 
 if __name__ == "__main__":
@@ -166,6 +187,8 @@ if __name__ == "__main__":
     elif cmd == "download":
         dest = args[3] if len(args) > 3 else None
         cmd_download(args[1], args[2], dest)
+    elif cmd == "read":
+        cmd_read(args[1], args[2])
     elif cmd == "share":
         role = args[4] if len(args) > 4 else "viewer"
         cmd_share(args[1], args[2], args[3], role)
