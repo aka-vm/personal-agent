@@ -66,7 +66,7 @@ def fmt_msg(msg, svc):
     date = fmt_date(msg.get("internalDate", 0))
     unread = "UNREAD" in msg.get("labelIds", [])
     mark = "●" if unread else " "
-    return f"  {mark} [{msg['id'][:8]}]  {date}  {frm[:30]:<30}  {subj[:60]}"
+    return f"  {mark} [{msg['id']}]  {date}  {frm[:30]:<30}  {subj[:60]}"
 
 def cmd_list(account, limit=15, query="in:inbox"):
     svc = get_service(account)
@@ -103,14 +103,23 @@ def cmd_search(account, query, limit=15):
 
 def cmd_read(account, msg_id):
     svc = get_service(account)
-    # expand short ID prefix
+    # Listings now print full IDs, so msg_id is normally used directly. Fallback:
+    # if a short prefix was passed, resolve it from recent messages (search wider).
     if len(msg_id) < 16:
-        result = svc.users().messages().list(userId="me", maxResults=50).execute()
+        match = None
+        result = svc.users().messages().list(userId="me", maxResults=200).execute()
         for m in result.get("messages", []):
             if m["id"].startswith(msg_id):
-                msg_id = m["id"]
-                break
-    msg = svc.users().messages().get(userId="me", id=msg_id, format="full").execute()
+                match = m["id"]; break
+        if not match:
+            print(f"Couldn't resolve short id '{msg_id}'. Use the full ID from the listing.")
+            return
+        msg_id = match
+    try:
+        msg = svc.users().messages().get(userId="me", id=msg_id, format="full").execute()
+    except Exception as e:
+        print(f"Couldn't open message {msg_id}: {e}")
+        return
     hdrs = msg["payload"]["headers"]
     print(f"\nFrom:    {header(hdrs, 'From')}")
     print(f"To:      {header(hdrs, 'To')}")
