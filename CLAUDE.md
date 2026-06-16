@@ -35,6 +35,12 @@ This Pi runs on **IST (Asia/Kolkata)**. The system clock AND cron both use IST.
   failed silently. Prefer a logged, retrying task; if you must use cron, add a
   log redirect (`>> .../logs/x.log 2>&1`) so failures are visible, and double-check
   the hour is IST.
+- **Other people's times → convert to IST for Vineet.** When showing someone's
+  availability / free slots / a proposed meeting time, always give it in IST. If
+  they're in another timezone, show both (e.g. "3:00 PM IST / 1:30 PM their time").
+- **State the timezone explicitly** for anything work/official, or with anyone in
+  a different timezone — e.g. "2:00 PM IST", never a bare "2 PM". For casual
+  same-timezone chat, plain IST time is fine.
 
 ## Memory
 Your long-term memory is below. Read it every turn. When Vineet shares a
