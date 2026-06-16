@@ -132,8 +132,14 @@ def main():
             for m in sorted(new, key=lambda x: x.get("timestamp", 0)):
                 txt = (m.get("text") or "").strip()
                 if txt:
-                    print(f"[whatsapp] << {txt[:100]}")
-                    process(txt)
+                    quoted = (m.get("quoted") or "").strip()
+                    if quoted:
+                        # give the agent the message Vineet replied to, for context
+                        full = f'(In reply to: "{quoted[:500]}")\n\n{txt}'
+                    else:
+                        full = txt
+                    print(f"[whatsapp] << {txt[:80]}" + (" [reply]" if quoted else ""))
+                    process(full)
                 last_ts = max(last_ts, m.get("timestamp", 0))
                 save_offset(last_ts)
         except Exception as e:
