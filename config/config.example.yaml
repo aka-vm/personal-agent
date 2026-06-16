@@ -23,8 +23,11 @@ whatsapp:
   bridge_url: "http://localhost:3001"
   # Your own number (full access, like the Telegram owner).
   owner_phone: "910000000000"
-  # Group where the agent posts replies + mirrors outbound messages.
+  # Audit-log group: mirrors outbound messages the agent sends to other people.
   log_group: "000000000000000000@g.us"
+  # Conversational group: you chat with the agent here (like Telegram). Create a
+  # WhatsApp group with just you + the bot's number; find its id via GET /groups.
+  chat_group: "000000000000000000@g.us"
 
 paths:
   # Runtime state (session ids, polling offsets). Outside the repo.

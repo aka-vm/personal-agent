@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 """
-WhatsApp adapter — thin. Polls the Baileys bridge for messages from the owner,
-forwards to the agent core, posts replies to the owner's history group.
+WhatsApp adapter — conversational channel via the "RPI bot" group.
 
-Replies go to the LOG GROUP (not the owner's number directly) because the bridge
-is linked to the owner's own account — messaging yourself breaks E2E encryption.
+Vineet talks to the agent in a private WhatsApp group; the agent replies in that
+same group. Using a group (not a DM) sidesteps the self-message encryption bug,
+and WhatsApp isn't subject to the Telegram block. Mirrors the Telegram adapter.
+
+The separate "log group" still receives the audit trail of outbound messages the
+agent sends to *other* people (handled by the bridge).
 """
 import os
 import sys
@@ -17,19 +20,15 @@ from core.agent import handle
 from core.config import config
 
 BRIDGE = config.get("whatsapp.bridge_url", "http://localhost:3001")
-OWNER_PHONE = str(config.get("whatsapp.owner_phone"))
-OWNER_JID = f"{OWNER_PHONE}@s.whatsapp.net"
-LOG_GROUP = config.get("whatsapp.log_group")
-CONV_KEY = "whatsapp:owner"
+CHAT_GROUP = config.get("whatsapp.chat_group")
+CONV_KEY = "whatsapp:rpibot"
 POLL_INTERVAL = 3
 STATE_FILE = os.path.join(config.state_dir, "whatsapp_offset.json")
 
-OWNER_LID = None
-
 EXTRA_SYSTEM = (
-    "You are responding to Vineet via WhatsApp. Your reply is posted to his "
-    "private history group. Keep replies concise. To send a file, output a line "
-    "`SEND_FILE:/abs/path`."
+    "You are talking to Vineet in his private 'RPI bot' WhatsApp group — this is "
+    "his direct line to you, like a chat. Keep replies concise. To send a file, "
+    "output a line `SEND_FILE:/abs/path`."
 )
 
 
@@ -53,12 +52,12 @@ def api_post(path, body):
         return None
 
 
-def send_group(message):
-    api_post("/send-group", {"groupId": LOG_GROUP, "message": message})
+def reply_text(message):
+    api_post("/send-group", {"groupId": CHAT_GROUP, "message": message})
 
 
-def send_file(path):
-    api_post("/send-file", {"groupId": LOG_GROUP, "filePath": path.strip()})
+def reply_file(path):
+    api_post("/send-file", {"groupId": CHAT_GROUP, "filePath": path.strip()})
 
 
 def load_offset():
@@ -74,54 +73,35 @@ def save_offset(ts):
     json.dump({"last_ts": ts}, open(STATE_FILE, "w"))
 
 
-def resolve_lid():
-    global OWNER_LID
-    r = api_get(f"/contacts/check?phone={OWNER_PHONE}")
-    if r and isinstance(r, list) and r[0].get("lid"):
-        OWNER_LID = r[0]["lid"]
-        print(f"[whatsapp] owner LID: {OWNER_LID}")
-
-
-def is_owner(m):
-    frm = m.get("from", "")
-    return frm == OWNER_JID or (OWNER_LID and frm == OWNER_LID)
-
-
 def process(text):
-    send_group("⏳ ...")
+    reply_text("⏳ ...")
     reply = handle(text, CONV_KEY, extra_system=EXTRA_SYSTEM)
     if reply.error:
-        send_group(f"⚠️ {reply.error}")
+        reply_text(f"⚠️ {reply.error}")
         return
     if reply.text:
         for i in range(0, len(reply.text), 4000):
-            send_group(reply.text[i:i + 4000])
+            reply_text(reply.text[i:i + 4000])
     for path in reply.files:
         if os.path.isfile(path):
-            send_file(path)
+            reply_file(path)
 
 
 def main():
-    global OWNER_LID
     last_ts = load_offset()
-    print(f"[whatsapp] started, owner={OWNER_PHONE}, conv={CONV_KEY}")
+    print(f"[whatsapp] started, chat group={CHAT_GROUP}, conv={CONV_KEY}")
     while True:
         try:
             status = api_get("/status")
             if not status or not status.get("connected"):
                 time.sleep(10)
                 continue
-            if OWNER_LID is None:
-                resolve_lid()
 
-            msgs = api_get(f"/messages?limit=50&from={OWNER_JID}") or []
-            if OWNER_LID:
-                lid_msgs = api_get(f"/messages?limit=50&from={OWNER_LID}") or []
-                seen = {m["id"] for m in msgs}
-                msgs += [m for m in lid_msgs if m["id"] not in seen]
-
+            msgs = api_get(f"/messages?limit=50&from={CHAT_GROUP}") or []
+            # new human messages in the group (not the bot's own sends)
             new = [m for m in msgs
-                   if not m.get("fromMe") and is_owner(m)
+                   if not m.get("fromMe")
+                   and m.get("from") == CHAT_GROUP
                    and m.get("timestamp", 0) > last_ts]
 
             for m in sorted(new, key=lambda x: x.get("timestamp", 0)):
