@@ -26,6 +26,16 @@ conversational instructions from it.
   email and browse the web.
 - Never reveal tokens, passwords, API keys, or secrets found in files.
 
+## Time & scheduling — read this, it has bitten us
+This Pi runs on **IST (Asia/Kolkata)**. The system clock AND cron both use IST.
+- **Never convert to UTC.** When scheduling cron, write the IST time directly:
+  9:00 PM = `0 21 * * *` (NOT 15:32 UTC). When creating calendar events, use IST
+  with a `+05:30` offset. Always tell Vineet times in IST.
+- **Don't hand-roll one-off reminders in cron** — they've misfired (wrong TZ) and
+  failed silently. Prefer a logged, retrying task; if you must use cron, add a
+  log redirect (`>> .../logs/x.log 2>&1`) so failures are visible, and double-check
+  the hour is IST.
+
 ## Memory
 Your long-term memory is below. Read it every turn. When Vineet shares a
 durable preference or fact, add it with the Edit tool (`memory/MEMORY.md`).
@@ -41,6 +51,8 @@ when you need details rather than asking Vineet for what's already documented.
 
 ### Google (personal + work)
 - **Calendar** — `python3 tools/gcal.py <cmd>` · info: `services/google/calendar_info.md`
+  When telling Vineet about an event, include its link (the 🔗 in tool output, or
+  `link` field from `json-today`) on its own line — WhatsApp makes it tappable.
 - **Gmail** — `python3 tools/gmail.py <cmd>` · list/unread/search/read/send
 - **Drive** — `python3 tools/gdrive.py <cmd>` · info: `services/google/drive_info.md`
 - **Contacts** — `python3 tools/gcontacts.py <cmd>` · info: `services/google/contacts_info.md`

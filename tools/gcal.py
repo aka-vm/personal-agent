@@ -48,6 +48,9 @@ def format_event(event, account_label=""):
     line = f"{label}{time_str}  |  {title}"
     if loc:
         line += f"\n    📍 {loc}"
+    link = event.get("htmlLink", "")
+    if link:
+        line += f"\n    🔗 {link}"
     return line
 
 def get_events(service, days_ahead=7, days_back=0):
@@ -106,6 +109,7 @@ def cmd_json_today(accounts):
                 "end": en.get("dateTime", en.get("date")),
                 "all_day": all_day,
                 "location": e.get("location", ""),
+                "link": e.get("htmlLink", ""),
             })
     print(_json.dumps(out))
 
