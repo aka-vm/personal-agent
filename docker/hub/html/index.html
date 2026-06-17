@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Vineet's Hub</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{--bg:#0d0f15;--card:#171b26;--card2:#202636;--line:#2a3142;--txt:#e6eaf2;--mut:#8a94a8;--blue:#5b8cff;--green:#34c759;--red:#ff4d5e;--violet:#8b5cf6}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--txt);padding:26px 18px 60px;max-width:720px;margin:auto}
+  h1{font-size:1.45rem;color:#fff;letter-spacing:-.02em}
+  .sub{color:var(--mut);font-size:.82rem;margin-top:2px}
+  .toolbar{display:flex;gap:8px;flex-wrap:wrap;margin:18px 0 6px}
+  button{font:inherit;font-size:.85rem;border:0;border-radius:10px;padding:9px 13px;cursor:pointer;color:var(--txt);background:var(--card2);transition:.15s;display:inline-flex;align-items:center;gap:7px}
+  button:hover:not(:disabled){filter:brightness(1.18)} button:disabled{opacity:.6;cursor:default}
+  .btn-green{background:rgba(52,199,89,.16);color:#7ee29a}
+  .btn-red{background:rgba(255,77,94,.16);color:#ff8a96}
+  .btn-open{background:rgba(91,140,255,.18);color:#9bbcff;flex:1;justify-content:center;text-decoration:none}
+  .btn-open:hover{filter:brightness(1.18)} .btn-open.disabled{opacity:.4;pointer-events:none}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:15px 16px;margin:12px 0;transition:.2s}
+  .card.live{border-color:rgba(139,92,246,.45);box-shadow:0 0 0 1px rgba(139,92,246,.25)}
+  .card.pending{opacity:.7}
+  .crow{display:flex;align-items:center;gap:10px}
+  .dot{width:10px;height:10px;border-radius:50%;flex:none}
+  .up{background:var(--green)}.down{background:#5a6072}.partial{background:#e0a83a}
+  .pending .dot{animation:pulse 1s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+  .nm{flex:1;font-weight:650;font-size:1.04rem}
+  .badge{font-size:10px;color:var(--mut);border:1px solid var(--line);border-radius:6px;padding:2px 7px;margin-left:7px;text-transform:uppercase}
+  .state{font-size:.76rem;color:var(--mut)}
+
+  .row{display:flex;gap:8px;align-items:center;margin-top:12px}
+  .toggle{display:flex;align-items:center;gap:8px;font-size:.78rem;color:var(--mut);white-space:nowrap}
+  .sw{width:42px;height:24px;border-radius:14px;background:#39414f;position:relative;cursor:pointer;transition:.2s;flex:none}
+  .sw.on{background:var(--violet)} .sw.disabled{opacity:.35;cursor:not-allowed}
+  .sw i{position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:.2s}
+  .sw.on i{left:21px}
+
+  .pub{margin-top:11px;padding:11px 13px;border-radius:11px;background:rgba(139,92,246,.13);border:1px solid rgba(139,92,246,.32);display:flex;align-items:center;gap:10px;font-size:.82rem}
+  .pub a{color:#c4b5fd;text-decoration:none;flex:1;word-break:break-all}
+  .pub button{background:rgba(255,255,255,.1);padding:6px 10px;font-size:.74rem}
+  .spin{width:13px;height:13px;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:sp .7s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .foot{color:var(--mut);font-size:.78rem;margin-top:18px;line-height:1.55}
+</style></head><body>
+<h1>⚙️ Vineet's Hub</h1>
+<div class="sub">Open services on your tailnet · share one publicly on demand</div>
+
+<div class="toolbar">
+  <button class="btn-green" id="gon" onclick="g('on',this)">▶ Start all optional</button>
+  <button class="btn-red" id="goff" onclick="g('off',this)">⏹ Stop all optional</button>
+</div>
+
+<div id="services"></div>
+
+<div class="foot">
+  <b>Open</b> launches the service on your tailnet. <b>Public</b> shares it via ngrok —
+  only <b>one service at a time</b> (free tier), so turning one on disables the rest.
+  Core services (WhatsApp, Home Assistant) stay up on “Stop all optional”. This dashboard is never public.
+</div>
+
+<script>
+let S = {}, pending = {};
+const openURL = p => `http://${location.hostname}:${p}`;
+
+async function load(){
+  S = await (await fetch('/api/status')).json();
+  const someShared = !!S.shared;
+  const wrap = document.getElementById('services'); wrap.innerHTML = '';
+  for (const [k,v] of Object.entries(S.services||{})){
+    const up = v.state==='up';
+    const isPending = pending[k];
+    const open = v.web
+      ? `<a class="btn-open ${up?'':'disabled'}" href="${openURL(v.port)}" target="_blank">🔗 Open${up?'':' (stopped)'}</a>` : '';
+    // one public at a time: disable other toggles while one is shared
+    const tDisabled = someShared && !v.shared;
+    const toggle = v.shareable
+      ? `<div class="toggle">Public<div class="sw ${v.shared?'on':''} ${tDisabled?'disabled':''}" onclick="${tDisabled?'':`share('${k}')`}"><i></i></div></div>` : '';
+    const pub = (v.shared && v.url)
+      ? `<div class="pub">🌍 <a href="${v.url}" target="_blank">${v.url}</a><button onclick="copy('${v.url}')">Copy</button></div>` : '';
+    wrap.innerHTML += `<div class="card ${v.shared?'live':''} ${isPending?'pending':''}">
+      <div class="crow">
+        <span class="dot ${v.state}"></span>
+        <span class="nm">${v.label}${v.core?'<span class=badge>core</span>':''}</span>
+        <span class="state">${isPending?'…':v.state}</span>
+      </div>
+      <div class="row">
+        ${open}
+        <button class="${up?'btn-red':'btn-green'}" ${isPending?'disabled':''} onclick="svc('${k}','${up?'stop':'start'}',this)">
+          ${isPending?'<span class=spin></span>':''}${up?'Stop':'Start'}</button>
+        ${toggle}
+      </div>
+      ${pub}
+    </div>`;
+  }
+}
+async function svc(k,a,btn){
+  pending[k]=true; if(btn){btn.disabled=true; btn.innerHTML='<span class=spin></span>'+(a==='start'?'Starting…':'Stopping…');}
+  await fetch('/api/services/'+k+'/'+a,{method:'POST'});
+  setTimeout(()=>{delete pending[k]; load();}, 1600);
+}
+async function g(a,btn){
+  const t=btn.innerHTML; btn.disabled=true; btn.innerHTML='<span class=spin></span>'+(a==='on'?'Starting…':'Stopping…');
+  await fetch('/api/global/'+a,{method:'POST'});
+  setTimeout(()=>{btn.disabled=false; btn.innerHTML=t; load();}, 2600);
+}
+async function share(k){
+  // optimistic flip
+  document.querySelectorAll('.sw').forEach(s=>s.classList.add('disabled'));
+  await fetch('/api/share/'+k,{method:'POST'}); load();
+}
+function copy(t){ navigator.clipboard?.writeText(t); }
+load(); setInterval(()=>{ if(!Object.keys(pending).length) load(); }, 8000);
+</script></body></html>
