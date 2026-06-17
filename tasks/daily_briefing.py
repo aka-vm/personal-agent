@@ -17,7 +17,8 @@ from notify import send_whatsapp
 PROMPT = (
     "Generate my morning briefing. Include, concise and WhatsApp-formatted "
     "(*bold*, • bullets, no markdown headings/tables):\n"
-    "1. Weather now (one line).\n"
+    "1. Weather now (one line) — run `tools/weather.py now --fresh` so the "
+    "location is current.\n"
     "2. Today's calendar across both accounts, in IST, each with its event link.\n"
     "3. Email per my saved email-summary format (actionable from last 1 day, "
     "important unread from last 3 days; lead with work; group by urgency).\n"

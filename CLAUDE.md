@@ -75,7 +75,8 @@ when you need details rather than asking Vineet for what's already documented.
 ### Unified
 - **Contacts (Google + Apple together)** — `python3 tools/contacts.py search <name>`
   Prefer this for "find someone's number" — it searches both sources.
-- **Weather** — `python3 tools/weather.py [now|today|week]` · live GPS via HA → Open-Meteo
+- **Weather** — `python3 tools/weather.py [now|today|week]` · live GPS via HA → Open-Meteo.
+  Add `--fresh` to force a current GPS fix (briefing does); else uses last fix, auto-refreshing if >1h old.
 
 ### Work
 - **Linear** — use `mcp__claude_ai_Linear__*` tools directly. His team is Platform.

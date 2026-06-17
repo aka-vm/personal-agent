@@ -8,11 +8,17 @@ Usage:
   weather.py today        — today's hourly
   weather.py week         — 7-day forecast
   weather.py now          — current conditions only
+  add --fresh to force a fresh GPS fix from the phone (used by the morning briefing)
+
+Location freshness: uses HA's last-known location, but requests a fresh GPS fix
+from the phone if --fresh is passed OR the last fix is older than 1 hour.
 """
-import sys, os, json, urllib.request, urllib.parse
+import sys, os, json, time, datetime, urllib.request, urllib.parse
 
 HA_URL    = "http://localhost:8123"
 HA_TOKEN  = open(os.path.expanduser("~/.config/homeassistant/token")).read().strip()
+PHONE_NOTIFY = "mobile_app_vineets_iphone"   # HA notify service for on-demand location
+STALE_AFTER  = 3600                          # seconds; refresh location if older
 
 WMO_CODES = {
     0: "Clear sky", 1: "Mainly clear", 2: "Partly cloudy", 3: "Overcast",
@@ -44,8 +50,41 @@ def ha_get(path):
     with urllib.request.urlopen(req, timeout=5) as r:
         return json.loads(r.read())
 
-def get_location():
-    data  = ha_get("/api/states/person.vineet")
+def ha_post(path, body):
+    req = urllib.request.Request(
+        HA_URL + path, data=json.dumps(body).encode(), method="POST",
+        headers={"Authorization": f"Bearer {HA_TOKEN}", "Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=10) as r:
+        return r.read()
+
+def _age_seconds(data):
+    """How old is HA's location for person.vineet, in seconds."""
+    try:
+        lu = data.get("last_updated", "").replace("Z", "+00:00")
+        dt = datetime.datetime.fromisoformat(lu)
+        return (datetime.datetime.now(datetime.timezone.utc) - dt).total_seconds()
+    except Exception:
+        return 1e9  # unknown → treat as stale
+
+def request_fresh_location():
+    """Ask the phone for a current GPS fix; wait (up to ~16s) for it to land."""
+    before = ha_get("/api/states/person.vineet").get("last_updated")
+    try:
+        ha_post(f"/api/services/notify/{PHONE_NOTIFY}",
+                {"message": "request_location_update"})
+    except Exception:
+        return  # phone unreachable — fall back to last-known
+    for _ in range(8):
+        time.sleep(2)
+        if ha_get("/api/states/person.vineet").get("last_updated") != before:
+            return
+
+def get_location(force_fresh=False):
+    data = ha_get("/api/states/person.vineet")
+    # Request a fresh fix only when it matters: forced (e.g. briefing), or stale.
+    if force_fresh or _age_seconds(data) > STALE_AFTER:
+        request_fresh_location()
+        data = ha_get("/api/states/person.vineet")
     attrs = data.get("attributes", {})
     lat   = attrs.get("latitude")
     lon   = attrs.get("longitude")
@@ -143,9 +182,11 @@ def cmd_week(lat, lon, location_name, ha_state):
         print(f"  {label}  {emoji} {desc:<20} ↑{hi}° ↓{lo}°  🌧{prob}% ({rain}mm)")
 
 if __name__ == "__main__":
-    cmd = sys.argv[1] if len(sys.argv) > 1 else "today"
+    args = [a for a in sys.argv[1:] if a != "--fresh"]
+    force_fresh = "--fresh" in sys.argv[1:]
+    cmd = args[0] if args else "today"
     try:
-        lat, lon, ha_state = get_location()
+        lat, lon, ha_state = get_location(force_fresh=force_fresh)
         location_name = reverse_geocode(lat, lon)
     except Exception as e:
         print(f"Error getting location: {e}"); sys.exit(1)
