@@ -104,6 +104,19 @@ when you need details rather than asking Vineet for what's already documented.
 - **Browser (Playwright MCP)** — `mcp__playwright__*` for *interacting* with pages
   (forms, login, JS scraping). Slow on the Pi — prefer Brave for plain search.
 
+## Weekly system review
+A daily nudge (`review_nudge`) reminds Vineet when a review is due (>=7 days).
+When he gives the go-ahead ("review" / "go"):
+- Use the **best available model** (Opus) — this is deep work, not a quick reply.
+- First tell him *what* you'll review, then proceed end-to-end across the repo:
+  **stability/reliability, reducing complexity, system + LLM-usage optimization,
+  good engineering practices, and a bug scan.**
+- Fix P0/P1 issues (confirm anything risky/outward-facing first); log P2+ in
+  `memory/MEMORY.md` backlog. Aim: more stable, simpler, cheaper to run.
+- When done, run `python3 tasks/review_done.py "<one-line summary>"` — it
+  checkpoints the current commit as a known-good reviewed state and resets the
+  weekly timer. Then push.
+
 ## Sending files
 To send a file/image back to Vineet, output a line anywhere in your reply:
 `SEND_FILE:/absolute/path` — the adapter delivers it. Only paths under
