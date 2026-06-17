@@ -1,29 +1,27 @@
 #!/usr/bin/env python3
 """
-Control backend (host systemd service, :8090). JSON API only — the dashboard UI
-is served by the hub nginx on :80, which proxies /api/ here.
+Control backend (host systemd service, :8090). JSON API only — the hub nginx (:80)
+serves the dashboard and proxies /api/ here.
 
-- start/stop services (docker)
-- global on/off (optional services; core stays up)
-- single ngrok tunnel ON/OFF -> the gateway (:8081, path-routes services).
-  When ON, a service is reachable at <ngrok-base>/<name>/. The dashboard (:80)
-  is NEVER part of the gateway, so it's never exposed publicly.
+Public sharing model (free ngrok): ONE service at a time, exposed at the tunnel
+ROOT (so it actually works — no sub-path breakage). Each shareable service has a
+Share toggle; sharing one stops any other. The dashboard itself is never tunneled.
+(Clean multi-service URLs would need paid ngrok / an own domain — planned.)
 """
 import json, subprocess, urllib.request, time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-GATEWAY_PORT = 8081  # nginx gateway that path-routes services; ngrok points here
-
 SERVICES = {
-    "excalidraw":   {"containers": ["excalidraw"], "core": False, "label": "Excalidraw"},
-    "karakeep":     {"containers": ["karakeep-web-1", "karakeep-meilisearch-1", "karakeep-chrome-1"], "core": False, "label": "Karakeep"},
-    "n8n":          {"containers": ["n8n"], "core": False, "label": "n8n"},
-    "playwright":   {"containers": ["playwright-mcp-playwright-mcp-1"], "core": False, "label": "Browser (Playwright)"},
-    "homeassistant":{"containers": ["homeassistant"], "core": True, "label": "Home Assistant"},
-    "whatsapp":     {"containers": ["whatsapp-baileys-whatsapp-1"], "core": True, "label": "WhatsApp bridge"},
+    "excalidraw":   {"containers": ["excalidraw"], "core": False, "shareable": True,  "port": 5001, "label": "Excalidraw"},
+    "karakeep":     {"containers": ["karakeep-web-1", "karakeep-meilisearch-1", "karakeep-chrome-1"], "core": False, "shareable": True, "port": 3000, "label": "Karakeep"},
+    "n8n":          {"containers": ["n8n"], "core": False, "shareable": True,  "port": 5678, "label": "n8n"},
+    "playwright":   {"containers": ["playwright-mcp-playwright-mcp-1"], "core": False, "shareable": False, "port": 3333, "label": "Browser (Playwright)"},
+    "homeassistant":{"containers": ["homeassistant"], "core": True, "shareable": True, "port": 8123, "label": "Home Assistant"},
+    "whatsapp":     {"containers": ["whatsapp-baileys-whatsapp-1"], "core": True, "shareable": False, "port": 3001, "label": "WhatsApp bridge"},
 }
 
 ngrok_proc = None
+shared = None  # name of the currently shared service
 
 
 def docker_running():
@@ -31,7 +29,7 @@ def docker_running():
     return set(out.split())
 
 
-def ngrok_base():
+def ngrok_url():
     try:
         d = json.loads(urllib.request.urlopen("http://localhost:4040/api/tunnels", timeout=4).read())
         return d["tunnels"][0]["public_url"] if d.get("tunnels") else None
@@ -41,16 +39,17 @@ def ngrok_base():
 
 def status():
     running = docker_running()
-    base = ngrok_base()
+    base = ngrok_url()
     svc = {}
     for name, cfg in SERVICES.items():
         up = sum(1 for c in cfg["containers"] if c in running)
         svc[name] = {
-            "label": cfg["label"], "core": cfg["core"],
+            "label": cfg["label"], "core": cfg["core"], "shareable": cfg["shareable"],
             "state": "up" if up == len(cfg["containers"]) else ("partial" if up else "down"),
-            "public": f"{base}/{name}/" if base else None,
+            "shared": shared == name,
+            "url": base if shared == name else None,
         }
-    return {"services": svc, "ngrok": base}
+    return {"services": svc, "shared": shared, "url": base}
 
 
 def set_service(name, action):
@@ -59,28 +58,35 @@ def set_service(name, action):
             subprocess.run(["docker", action, c], capture_output=True)
 
 
-def ngrok_on():
-    global ngrok_proc
-    if ngrok_base():
-        return ngrok_base()
-    ngrok_proc = subprocess.Popen(
-        ["/home/vineet/.local/bin/ngrok", "http", str(GATEWAY_PORT), "--log", "stdout"],
-        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    for _ in range(12):
-        time.sleep(1)
-        if ngrok_base():
-            return ngrok_base()
-    return None
-
-
-def ngrok_off():
-    global ngrok_proc
+def share_stop():
+    global ngrok_proc, shared
     if ngrok_proc:
         ngrok_proc.terminate()
         try: ngrok_proc.wait(5)
         except Exception: ngrok_proc.kill()
     ngrok_proc = None
     subprocess.run(["pkill", "-f", "ngrok http"], capture_output=True)
+    shared = None
+
+
+def share_start(name):
+    """Tunnel one service at the ngrok root."""
+    global ngrok_proc, shared
+    if name not in SERVICES or not SERVICES[name]["shareable"]:
+        return None
+    share_stop()
+    time.sleep(1)
+    port = SERVICES[name]["port"]
+    ngrok_proc = subprocess.Popen(
+        ["/home/vineet/.local/bin/ngrok", "http", str(port), "--log", "stdout"],
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    shared = name
+    for _ in range(12):
+        time.sleep(1)
+        u = ngrok_url()
+        if u:
+            return u
+    return None
 
 
 class H(BaseHTTPRequestHandler):
@@ -104,8 +110,10 @@ class H(BaseHTTPRequestHandler):
                 if not cfg["core"]:
                     set_service(name, "start" if p[2] == "on" else "stop")
             return self._j(200, {})
-        if p[:2] == ["api", "ngrok"] and len(p) == 3:
-            return self._j(200, {"ngrok": ngrok_on() if p[2] == "on" else (ngrok_off() or None)})
+        if p[:2] == ["api", "share"] and len(p) == 3:
+            if shared == p[2]:
+                share_stop(); return self._j(200, {"url": None})
+            return self._j(200, {"url": share_start(p[2])})
         self._j(404, {})
 
 
