@@ -1,0 +1,13 @@
+[Unit]
+Description=Pi Control Panel
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/vineet/control-panel
+ExecStart=/usr/bin/python3 /home/vineet/control-panel/app.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target

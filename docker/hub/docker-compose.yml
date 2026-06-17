@@ -1,0 +1,8 @@
+services:
+  hub:
+    image: nginx:alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - /home/vineet/hub/index.html:/usr/share/nginx/html/index.html:ro

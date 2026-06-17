@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vineet's Hub</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      min-height: 100vh;
+      padding: 40px 24px;
+    }
+
+    header {
+      max-width: 900px;
+      margin: 0 auto 40px;
+    }
+
+    header h1 {
+      font-size: 1.6rem;
+      font-weight: 600;
+      color: #f8fafc;
+      letter-spacing: -0.02em;
+    }
+
+    header p {
+      margin-top: 4px;
+      font-size: 0.85rem;
+      color: #64748b;
+    }
+
+    .grid {
+      max-width: 900px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 16px;
+    }
+
+    a.card {
+      display: block;
+      background: #1e2130;
+      border: 1px solid #2d3148;
+      border-radius: 12px;
+      padding: 20px 22px;
+      text-decoration: none;
+      color: inherit;
+      transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s;
+    }
+
+    a.card:hover {
+      border-color: #4f6ef7;
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(79, 110, 247, 0.12);
+    }
+
+    .card-icon {
+      font-size: 1.6rem;
+      margin-bottom: 12px;
+      line-height: 1;
+    }
+
+    .card-name {
+      font-size: 1rem;
+      font-weight: 600;
+      color: #f1f5f9;
+      margin-bottom: 4px;
+    }
+
+    .card-desc {
+      font-size: 0.8rem;
+      color: #64748b;
+      line-height: 1.4;
+    }
+
+    .card-url {
+      margin-top: 12px;
+      font-size: 0.72rem;
+      color: #4f6ef7;
+      opacity: 0.7;
+    }
+
+    .section-label {
+      max-width: 900px;
+      margin: 32px auto 12px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #475569;
+    }
+
+    .section-label:first-of-type {
+      margin-top: 0;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>Vineet's Hub</h1>
+    <p>vineet.werewolf-platy.ts.net</p>
+  </header>
+
+  <div class="section-label">Self-hosted</div>
+  <div class="grid">
+
+    <a class="card" href="http://vineet.werewolf-platy.ts.net:8090" target="_blank">
+      <div class="card-icon">⚙️</div>
+      <div class="card-name">Control Panel</div>
+      <div class="card-desc">Start/stop services, global on/off, on-demand public links</div>
+      <div class="card-url">:8090</div>
+    </a>
+
+    <a class="card" href="http://vineet.werewolf-platy.ts.net:5001" target="_blank">
+      <div class="card-icon">✏️</div>
+      <div class="card-name">Excalidraw</div>
+      <div class="card-desc">Self-hosted whiteboard; shareable via the control panel</div>
+      <div class="card-url">:5001</div>
+    </a>
+
+    <a class="card" href="http://vineet.werewolf-platy.ts.net:3000" target="_blank">
+      <div class="card-icon">🔖</div>
+      <div class="card-name">Karakeep</div>
+      <div class="card-desc">Bookmarks, read-later, and link saving with AI tagging</div>
+      <div class="card-url">:3000</div>
+    </a>
+
+    <a class="card" href="http://vineet.werewolf-platy.ts.net:5678" target="_blank">
+      <div class="card-icon">⚡</div>
+      <div class="card-name">n8n</div>
+      <div class="card-desc">Workflow automation and webhook integrations</div>
+      <div class="card-url">:5678</div>
+    </a>
+
+    <a class="card" href="http://vineet.werewolf-platy.ts.net:8123" target="_blank">
+      <div class="card-icon">🏠</div>
+      <div class="card-name">Home Assistant</div>
+      <div class="card-desc">Smart home control — lights, switches, devices</div>
+      <div class="card-url">:8123</div>
+    </a>
+
+  </div>
+
+  <div class="section-label">External</div>
+  <div class="grid">
+
+    <a class="card" href="https://secure.splitwise.com" target="_blank">
+      <div class="card-icon">💸</div>
+      <div class="card-name">Splitwise</div>
+      <div class="card-desc">Expense splitting and group balances</div>
+      <div class="card-url">splitwise.com</div>
+    </a>
+
+  </div>
+
+</body>
+</html>
