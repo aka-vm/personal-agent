@@ -1,0 +1,13 @@
+services:
+  n8n:
+    image: n8nio/n8n
+    container_name: n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    volumes:
+      - /mnt/ssd/rpi_storage/n8n:/home/node/.n8n
+    environment:
+      - WEBHOOK_URL=http://100.64.161.23:5678
+      - N8N_SECURE_COOKIE=false
+      - N8N_RELEASE_TYPE=stable

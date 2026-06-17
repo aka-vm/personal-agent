@@ -12,7 +12,6 @@ import json, subprocess, urllib.request, time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 SERVICES = {
-    "excalidraw":   {"containers": ["excalidraw"], "core": False, "shareable": True,  "port": 5001, "label": "Excalidraw"},
     "karakeep":     {"containers": ["karakeep-web-1", "karakeep-meilisearch-1", "karakeep-chrome-1"], "core": False, "shareable": True, "port": 3000, "label": "Karakeep"},
     "n8n":          {"containers": ["n8n"], "core": False, "shareable": True,  "port": 5678, "label": "n8n"},
     "playwright":   {"containers": ["playwright-mcp-playwright-mcp-1"], "core": False, "shareable": False, "port": 3333, "label": "Browser (Playwright)"},
