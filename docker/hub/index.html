@@ -4,57 +4,102 @@
 <title>Vineet's Hub</title>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#0f1117;color:#e2e8f0;padding:32px 20px;max-width:760px;margin:auto}
-  h1{font-size:1.5rem;color:#f8fafc}
-  .sub{color:#64748b;font-size:.85rem;margin-top:3px}
-  .bar{display:flex;gap:10px;flex-wrap:wrap;margin:18px 0}
-  button{background:#262b38;color:#e2e8f0;border:0;border-radius:9px;padding:9px 14px;cursor:pointer;font-size:.88rem}
-  button:hover{background:#333a4a}
-  .on{background:#1f6f3f}.on:hover{background:#268049}.off{background:#7a2630}.off:hover{background:#8f2d39}
-  .share{background:#3a2e6b}.share.active{background:#5a47a8}
-  .card{background:#1a1e29;border:1px solid #2a3042;border-radius:12px;padding:14px 16px;margin:9px 0;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-  .dot{width:10px;height:10px;border-radius:50%;flex:none}
-  .up{background:#3fbf6f}.down{background:#6b7280}.partial{background:#d9a441}
-  .nm{flex:1;font-weight:600}.core{font-size:10px;color:#8b94a7;border:1px solid #3a4255;border-radius:5px;padding:1px 6px;margin-left:6px}
-  .pub{flex-basis:100%;font-size:.8rem;color:#6cb0ff;word-break:break-all;margin-top:4px}
-  .pub a{color:#6cb0ff}
-</style></head><body>
-<h1>⚙️ Vineet's Hub</h1>
-<div class="sub">Service controls + on-demand public sharing — on your tailnet.</div>
+  :root{--bg:#0d0f15;--card:#171b26;--card2:#1e2330;--line:#2a3142;--txt:#e6eaf2;--mut:#8a94a8;--blue:#5b8cff;--green:#34c759;--red:#ff4d5e;--violet:#8b5cf6}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--txt);padding:28px 18px 60px;max-width:720px;margin:auto}
+  header{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+  h1{font-size:1.45rem;color:#fff;letter-spacing:-.02em}
+  .sub{color:var(--mut);font-size:.82rem}
+  .toolbar{display:flex;gap:8px;flex-wrap:wrap;margin:18px 0 8px}
+  button{font:inherit;font-size:.85rem;border:0;border-radius:10px;padding:9px 13px;cursor:pointer;color:var(--txt);background:var(--card2);transition:.15s}
+  button:hover{filter:brightness(1.18)}
+  .btn-green{background:rgba(52,199,89,.16);color:#7ee29a}
+  .btn-red{background:rgba(255,77,94,.16);color:#ff8a96}
+  .btn-ghost{background:var(--card2)}
 
-<div class="bar">
-  <button class="on" onclick="g('on')">▶ Start optional</button>
-  <button class="off" onclick="g('off')">⏹ Stop optional</button>
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin:12px 0;transition:.15s}
+  .card.live{border-color:rgba(91,140,255,.35)}
+  .crow{display:flex;align-items:center;gap:10px}
+  .dot{width:9px;height:9px;border-radius:50%;flex:none;box-shadow:0 0 0 4px rgba(255,255,255,.04)}
+  .up{background:var(--green)}.down{background:#5a6072}.partial{background:#e0a83a}
+  .nm{flex:1;font-weight:650;font-size:1.02rem}
+  .badge{font-size:10px;color:var(--mut);border:1px solid var(--line);border-radius:6px;padding:2px 7px;margin-left:7px;text-transform:uppercase;letter-spacing:.04em}
+  .state{font-size:.76rem;color:var(--mut)}
+
+  .open{display:flex;align-items:center;gap:10px;margin-top:12px;padding:11px 13px;border-radius:11px;background:var(--card2);
+        text-decoration:none;color:var(--txt);border:1px solid transparent;transition:.15s}
+  .open:hover{border-color:var(--blue);background:#202738}
+  .open .ico{font-size:1.1rem}.open .lbl{flex:1;font-weight:550}.open .arr{color:var(--mut)}
+  .open.disabled{opacity:.45;pointer-events:none}
+
+  .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center}
+  .toggle{margin-left:auto;display:flex;align-items:center;gap:8px;font-size:.8rem;color:var(--mut)}
+  .sw{width:42px;height:24px;border-radius:14px;background:#39414f;position:relative;cursor:pointer;transition:.2s;flex:none}
+  .sw.on{background:var(--violet)}
+  .sw i{position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:.2s}
+  .sw.on i{left:21px}
+
+  .pub{margin-top:11px;padding:11px 13px;border-radius:11px;background:rgba(139,92,246,.12);border:1px solid rgba(139,92,246,.3);
+       display:flex;align-items:center;gap:10px;font-size:.82rem}
+  .pub a{color:#c4b5fd;text-decoration:none;flex:1;word-break:break-all}
+  .pub button{background:rgba(255,255,255,.08);padding:6px 10px;font-size:.75rem}
+  .foot{color:var(--mut);font-size:.78rem;margin-top:18px;line-height:1.5}
+</style></head><body>
+<header>
+  <div><h1>⚙️ Vineet's Hub</h1><div class="sub">Services · local & global access</div></div>
+</header>
+
+<div class="toolbar">
+  <button class="btn-green" onclick="g('on')">▶ Start optional</button>
+  <button class="btn-red" onclick="g('off')">⏹ Stop optional</button>
 </div>
 
 <div id="services"></div>
-<div class="sub" style="margin-top:16px">
-  <b>Share</b> exposes that one service publicly via ngrok (free = one at a time, at the link's root).
-  Stopping optional services keeps core (WhatsApp bridge, Home Assistant) up. The dashboard is never exposed.
+
+<div class="foot">
+  <b>Open</b> = access on your tailnet. <b>Public access</b> = a shareable ngrok link
+  (free: one service at a time). Stopping optional services keeps core (WhatsApp, Home
+  Assistant) running. This dashboard is never exposed publicly.
 </div>
 
 <script>
-let S={};
+let S = {};
+function openURL(port){ return `http://${location.hostname}:${port}`; }
+
 async function load(){
   S = await (await fetch('/api/status')).json();
-  const wrap=document.getElementById('services'); wrap.innerHTML='';
-  for(const [k,v] of Object.entries(S.services||{})){
-    const up=v.state==='up';
-    let shareBtn = v.shareable
-      ? `<button class="share ${v.shared?'active':''}" onclick="share('${k}')">${v.shared?'🌐 Stop sharing':'🌐 Share'}</button>` : '';
-    wrap.innerHTML += `<div class="card">
-      <span class="dot ${v.state}"></span>
-      <span class="nm">${v.label}${v.core?'<span class=core>core</span>':''}</span>
-      <button onclick="svc('${k}','${up?'stop':'start'}')">${up?'Stop':'Start'}</button>
-      ${shareBtn}
-      ${(v.shared && v.url)?`<span class="pub">🌐 <a href="${v.url}" target="_blank">${v.url}</a></span>`:''}
+  const wrap = document.getElementById('services'); wrap.innerHTML = '';
+  for (const [k,v] of Object.entries(S.services||{})){
+    const up = v.state==='up';
+    const local = openURL(v.port);
+    const openBlock = v.web
+      ? `<a class="open ${up?'':'disabled'}" href="${local}" target="_blank">
+           <span class="ico">🔗</span><span class="lbl">Open ${v.label}</span><span class="arr">${up?'↗':'(stopped)'}</span>
+         </a>` : '';
+    const shareToggle = v.shareable
+      ? `<div class="toggle">Public access
+           <div class="sw ${v.shared?'on':''}" onclick="share('${k}')"><i></i></div>
+         </div>` : '';
+    const pub = (v.shared && v.url)
+      ? `<div class="pub">🌍 <a href="${v.url}" target="_blank">${v.url}</a>
+           <button onclick="copy('${v.url}')">Copy</button></div>` : '';
+    wrap.innerHTML += `<div class="card ${v.shared?'live':''}">
+      <div class="crow">
+        <span class="dot ${v.state}"></span>
+        <span class="nm">${v.label}${v.core?'<span class=badge>core</span>':''}</span>
+        <span class="state">${v.state}</span>
+      </div>
+      ${openBlock}
+      <div class="actions">
+        <button class="${up?'btn-red':'btn-green'}" onclick="svc('${k}','${up?'stop':'start'}')">${up?'Stop':'Start'}</button>
+        ${shareToggle}
+      </div>
+      ${pub}
     </div>`;
   }
 }
-async function svc(k,a){ await fetch('/api/services/'+k+'/'+a,{method:'POST'}); setTimeout(load,1500); }
-async function g(a){ await fetch('/api/global/'+a,{method:'POST'}); setTimeout(load,2500); }
-async function share(k){
-  await fetch('/api/share/'+k,{method:'POST'}); load();
-}
-load(); setInterval(load,8000);
+async function svc(k,a){ await fetch('/api/services/'+k+'/'+a,{method:'POST'}); setTimeout(load,1400); }
+async function g(a){ await fetch('/api/global/'+a,{method:'POST'}); setTimeout(load,2400); }
+async function share(k){ document.querySelector(`[onclick="share('${k}')"]`)?.classList.toggle('on'); await fetch('/api/share/'+k,{method:'POST'}); load(); }
+function copy(t){ navigator.clipboard?.writeText(t); }
+load(); setInterval(load, 8000);
 </script></body></html>

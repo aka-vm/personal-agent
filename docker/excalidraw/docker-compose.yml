@@ -4,4 +4,4 @@ services:
     container_name: excalidraw
     restart: unless-stopped
     ports:
-      - "127.0.0.1:5001:80"
+      - "5001:80"   # reachable on the tailnet (so "Open" works from your devices)

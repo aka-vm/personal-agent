@@ -45,6 +45,7 @@ def status():
         up = sum(1 for c in cfg["containers"] if c in running)
         svc[name] = {
             "label": cfg["label"], "core": cfg["core"], "shareable": cfg["shareable"],
+            "port": cfg["port"], "web": cfg["shareable"],
             "state": "up" if up == len(cfg["containers"]) else ("partial" if up else "down"),
             "shared": shared == name,
             "url": base if shared == name else None,
