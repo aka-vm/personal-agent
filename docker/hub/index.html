@@ -1,162 +1,67 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Vineet's Hub</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+<html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Vineet's Hub</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#0f1117;color:#e2e8f0;padding:32px 20px;max-width:760px;margin:auto}
+  h1{font-size:1.5rem;color:#f8fafc}
+  .sub{color:#64748b;font-size:.85rem;margin-top:3px}
+  .bar{display:flex;gap:10px;flex-wrap:wrap;margin:20px 0}
+  button{background:#262b38;color:#e2e8f0;border:0;border-radius:9px;padding:10px 15px;cursor:pointer;font-size:.9rem}
+  button:hover{background:#333a4a}
+  .on{background:#1f6f3f}.on:hover{background:#268049}.off{background:#7a2630}.off:hover{background:#8f2d39}
+  .ngrok{background:#3a2e6b}.ngrok.active{background:#5a47a8}
+  .ngbox{background:#15182040;border:1px solid #2d3148;border-radius:10px;padding:12px 14px;margin:10px 0;font-size:.85rem}
+  .ngbox a{color:#6cb0ff}
+  .card{background:#1a1e29;border:1px solid #2a3042;border-radius:12px;padding:14px 16px;margin:9px 0;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .dot{width:10px;height:10px;border-radius:50%;flex:none}
+  .up{background:#3fbf6f}.down{background:#6b7280}.partial{background:#d9a441}
+  .nm{flex:1;font-weight:600}.core{font-size:10px;color:#8b94a7;border:1px solid #3a4255;border-radius:5px;padding:1px 6px;margin-left:6px}
+  .pub{flex-basis:100%;font-size:.78rem;color:#6cb0ff;word-break:break-all;margin-top:2px}
+  .pub a{color:#6cb0ff}
+</style></head><body>
+<h1>⚙️ Vineet's Hub</h1>
+<div class="sub">Services, public sharing, and controls — on your tailnet.</div>
 
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background: #0f1117;
-      color: #e2e8f0;
-      min-height: 100vh;
-      padding: 40px 24px;
-    }
+<div class="bar">
+  <button class="ngrok" id="ngbtn" onclick="toggleNgrok()">🌐 Public access: …</button>
+  <button class="on" onclick="g('on')">▶ Start optional</button>
+  <button class="off" onclick="g('off')">⏹ Stop optional</button>
+</div>
+<div class="ngbox" id="ngbox" style="display:none"></div>
 
-    header {
-      max-width: 900px;
-      margin: 0 auto 40px;
-    }
+<div id="services"></div>
+<div class="sub" style="margin-top:16px">Stopping optional services keeps core (WhatsApp bridge, Home Assistant) running. The dashboard itself is never exposed publicly.</div>
 
-    header h1 {
-      font-size: 1.6rem;
-      font-weight: 600;
-      color: #f8fafc;
-      letter-spacing: -0.02em;
-    }
+<script>
+let S={};
+async function load(){
+  S = await (await fetch('/api/status')).json();
+  const ng = S.ngrok;
+  const btn=document.getElementById('ngbtn'); const box=document.getElementById('ngbox');
+  btn.textContent = ng ? '🌐 Public access: ON' : '🌐 Public access: OFF';
+  btn.classList.toggle('active', !!ng);
+  if(ng){ box.style.display='block'; box.innerHTML = 'Public base: <a href="'+ng+'" target="_blank">'+ng+'</a><br><small>Each exposed service is at base/&lt;name&gt;/</small>'; }
+  else { box.style.display='none'; }
 
-    header p {
-      margin-top: 4px;
-      font-size: 0.85rem;
-      color: #64748b;
-    }
-
-    .grid {
-      max-width: 900px;
-      margin: 0 auto;
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-      gap: 16px;
-    }
-
-    a.card {
-      display: block;
-      background: #1e2130;
-      border: 1px solid #2d3148;
-      border-radius: 12px;
-      padding: 20px 22px;
-      text-decoration: none;
-      color: inherit;
-      transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s;
-    }
-
-    a.card:hover {
-      border-color: #4f6ef7;
-      transform: translateY(-2px);
-      box-shadow: 0 8px 24px rgba(79, 110, 247, 0.12);
-    }
-
-    .card-icon {
-      font-size: 1.6rem;
-      margin-bottom: 12px;
-      line-height: 1;
-    }
-
-    .card-name {
-      font-size: 1rem;
-      font-weight: 600;
-      color: #f1f5f9;
-      margin-bottom: 4px;
-    }
-
-    .card-desc {
-      font-size: 0.8rem;
-      color: #64748b;
-      line-height: 1.4;
-    }
-
-    .card-url {
-      margin-top: 12px;
-      font-size: 0.72rem;
-      color: #4f6ef7;
-      opacity: 0.7;
-    }
-
-    .section-label {
-      max-width: 900px;
-      margin: 32px auto 12px;
-      font-size: 0.7rem;
-      font-weight: 600;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: #475569;
-    }
-
-    .section-label:first-of-type {
-      margin-top: 0;
-    }
-  </style>
-</head>
-<body>
-
-  <header>
-    <h1>Vineet's Hub</h1>
-    <p>vineet.werewolf-platy.ts.net</p>
-  </header>
-
-  <div class="section-label">Self-hosted</div>
-  <div class="grid">
-
-    <a class="card" href="http://vineet.werewolf-platy.ts.net:8090" target="_blank">
-      <div class="card-icon">⚙️</div>
-      <div class="card-name">Control Panel</div>
-      <div class="card-desc">Start/stop services, global on/off, on-demand public links</div>
-      <div class="card-url">:8090</div>
-    </a>
-
-    <a class="card" href="http://vineet.werewolf-platy.ts.net:5001" target="_blank">
-      <div class="card-icon">✏️</div>
-      <div class="card-name">Excalidraw</div>
-      <div class="card-desc">Self-hosted whiteboard; shareable via the control panel</div>
-      <div class="card-url">:5001</div>
-    </a>
-
-    <a class="card" href="http://vineet.werewolf-platy.ts.net:3000" target="_blank">
-      <div class="card-icon">🔖</div>
-      <div class="card-name">Karakeep</div>
-      <div class="card-desc">Bookmarks, read-later, and link saving with AI tagging</div>
-      <div class="card-url">:3000</div>
-    </a>
-
-    <a class="card" href="http://vineet.werewolf-platy.ts.net:5678" target="_blank">
-      <div class="card-icon">⚡</div>
-      <div class="card-name">n8n</div>
-      <div class="card-desc">Workflow automation and webhook integrations</div>
-      <div class="card-url">:5678</div>
-    </a>
-
-    <a class="card" href="http://vineet.werewolf-platy.ts.net:8123" target="_blank">
-      <div class="card-icon">🏠</div>
-      <div class="card-name">Home Assistant</div>
-      <div class="card-desc">Smart home control — lights, switches, devices</div>
-      <div class="card-url">:8123</div>
-    </a>
-
-  </div>
-
-  <div class="section-label">External</div>
-  <div class="grid">
-
-    <a class="card" href="https://secure.splitwise.com" target="_blank">
-      <div class="card-icon">💸</div>
-      <div class="card-name">Splitwise</div>
-      <div class="card-desc">Expense splitting and group balances</div>
-      <div class="card-url">splitwise.com</div>
-    </a>
-
-  </div>
-
-</body>
-</html>
+  const wrap=document.getElementById('services'); wrap.innerHTML='';
+  for(const [k,v] of Object.entries(S.services||{})){
+    const up=v.state==='up';
+    wrap.innerHTML += `<div class="card">
+      <span class="dot ${v.state}"></span>
+      <span class="nm">${v.label}${v.core?'<span class=core>core</span>':''}</span>
+      <button onclick="svc('${k}','${up?'stop':'start'}')">${up?'Stop':'Start'}</button>
+      ${(ng && v.public)?`<span class="pub">🌐 <a href="${v.public}" target="_blank">${v.public}</a></span>`:''}
+    </div>`;
+  }
+}
+async function svc(k,a){ await fetch('/api/services/'+k+'/'+a,{method:'POST'}); setTimeout(load,1500); }
+async function g(a){ await fetch('/api/global/'+a,{method:'POST'}); setTimeout(load,2500); }
+async function toggleNgrok(){
+  const a = S.ngrok ? 'off':'on';
+  document.getElementById('ngbtn').textContent='🌐 …';
+  await fetch('/api/ngrok/'+a,{method:'POST'}); load();
+}
+load(); setInterval(load,8000);
+</script></body></html>
