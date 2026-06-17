@@ -43,15 +43,22 @@ def _req(method, path, body=None):
         return {"error": str(e)}
 
 
-def cmd_add(url, note=""):
+def cmd_add(url, note="", tags=None):
     body = {"type": "link", "url": url}
     if note:
         body["note"] = note
     r = _req("POST", "/bookmarks", body)
     if r.get("error"):
-        print(f"Error: {r['error']}")
-    else:
-        print(f"✓ Saved to Karakeep: {url}  (id {r.get('id','?')})")
+        print(f"Error: {r['error']}"); return
+    bid = r.get("id", "?")
+    if tags:
+        _req("POST", f"/bookmarks/{bid}/tags", {"tags": [{"tagName": t} for t in tags]})
+    print(f"✓ Saved to Karakeep: {url}  (id {bid})" + (f"  tags: {', '.join(tags)}" if tags else ""))
+
+
+def cmd_tag(bookmark_id, tags):
+    r = _req("POST", f"/bookmarks/{bookmark_id}/tags", {"tags": [{"tagName": t} for t in tags]})
+    print(f"✓ Tagged {bookmark_id}: {', '.join(tags)}" if not r.get("error") else f"Error: {r['error']}")
 
 
 def cmd_note(text):
@@ -79,7 +86,16 @@ if __name__ == "__main__":
         print(__doc__); sys.exit(0)
     cmd = args[0]
     if cmd == "add":
-        cmd_add(args[1], " ".join(args[2:]))
+        # add <url> [--tags a,b,c] [note words...]
+        rest = args[2:]
+        tags = None
+        if "--tags" in rest:
+            i = rest.index("--tags")
+            tags = [t.strip() for t in rest[i + 1].split(",") if t.strip()] if i + 1 < len(rest) else None
+            rest = rest[:i] + rest[i + 2:]
+        cmd_add(args[1], " ".join(rest), tags)
+    elif cmd == "tag":
+        cmd_tag(args[1], [t.strip() for t in " ".join(args[2:]).replace(",", " ").split() if t.strip()])
     elif cmd == "note":
         cmd_note(" ".join(args[1:]))
     elif cmd == "search":

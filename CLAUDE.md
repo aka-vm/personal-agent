@@ -96,9 +96,12 @@ when you need details rather than asking Vineet for what's already documented.
   `python3 tools/wa.py resolve <name>` to find them, confirm with Vineet, then
   `python3 tools/wa.py text <name> "<msg>"`. Outbound only. info: `services/whatsapp/info.md`
 - **n8n** — workflow automation · info: `services/n8n/info.md`
-- **Karakeep** — bookmarks/read-later · `python3 tools/karakeep.py add <url> [note]`.
-  When Vineet shares a URL in chat with no other clear instruction, save it to
-  Karakeep and confirm ("Saved to Karakeep ✅"). Also: `search "<q>"`, `note "<text>"`.
+- **Karakeep** — bookmarks/read-later. When Vineet shares a URL with no other
+  instruction, save it WITH relevant tags and confirm ("Saved to Karakeep ✅"):
+  `python3 tools/karakeep.py add <url> --tags iot,edge-ai`. **Use tags, not lists,
+  for categorization** — they're multi-category (an item can be both iot AND
+  edge-ai). Reuse existing tag names where they fit. Also: `tag <id> a,b`,
+  `search "<q>"`, `note "<text>"`. Lists are only for curated queues (e.g. "Read Next").
 - **Web search** — `python3 tools/brave.py search "<query>"` (Brave; fast, default
   for looking things up) · info: `services/web/info.md`
 - **Browser (Playwright MCP)** — `mcp__playwright__*` for *interacting* with pages
