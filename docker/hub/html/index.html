@@ -10,11 +10,11 @@
   .sub{color:var(--mut);font-size:.82rem;margin-top:3px}
   .toolbar{display:flex;gap:10px;margin:20px 0 4px}
   .toolbar button{flex:1}
-  button{font:inherit;font-size:.86rem;font-weight:550;border:0;border-radius:11px;padding:11px 14px;cursor:pointer;color:var(--txt);
-         background:var(--card2);transition:transform .08s,filter .15s,background .15s;display:inline-flex;align-items:center;justify-content:center;gap:7px}
-  button:hover:not(:disabled){filter:brightness(1.15)} button:active:not(:disabled){transform:scale(.97)} button:disabled{opacity:.55;cursor:default}
+  button,a.open{font:inherit;font-size:.88rem;font-weight:600;border:0;border-radius:12px;height:44px;padding:0 16px;cursor:pointer;color:var(--txt);
+         background:var(--card2);transition:transform .08s,filter .15s,background .15s;display:inline-flex;align-items:center;justify-content:center;gap:7px;line-height:1;text-decoration:none}
+  button:hover:not(:disabled),a.open:hover{filter:brightness(1.15)} button:active:not(:disabled),a.open:active{transform:scale(.97)} button:disabled{opacity:.55;cursor:default}
   .green{background:rgba(52,199,89,.16);color:#7ee29a} .red{background:rgba(255,73,92,.15);color:#ff8a96}
-  a.open{flex:1;text-decoration:none;background:rgba(91,140,255,.16);color:#9bbcff}
+  a.open{flex:1;background:rgba(91,140,255,.16);color:#9bbcff}
   a.open.dis{opacity:.4;pointer-events:none}
 
   .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:15px 16px 16px;margin:13px 0}
@@ -56,7 +56,7 @@ async function load(){
     const up = v.state==='up', pend = pending[k];
     const open = v.web
       ? `<a class="open ${up?'':'dis'}" href="${url(v.port)}" target="_blank">🔗 Open</a>`
-      : `<span style="flex:1"></span>`;
+      : ``;
     wrap.innerHTML += `<div class="card ${pend?'pending':''}">
       <div class="head">
         <span class="dot ${v.state}"></span>

@@ -23,3 +23,7 @@ memory/MEMORY.md
 # Personal service catalogs (contain contacts' PII); only the example is committed
 services/*
 !services/EXAMPLE_service.md
+
+# secrets
+.env
+**/.env

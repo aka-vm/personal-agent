@@ -7,6 +7,8 @@ services:
       - "5678:5678"
     volumes:
       - /mnt/ssd/rpi_storage/n8n:/home/node/.n8n
+    env_file:
+      - .env   # N8N_ENCRYPTION_KEY + N8N_USER_MANAGEMENT_JWT_SECRET (gitignored) — pins them so login survives restarts
     environment:
       - WEBHOOK_URL=http://100.64.161.23:5678
       - N8N_SECURE_COOKIE=false
