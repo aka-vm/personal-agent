@@ -57,8 +57,10 @@ when you need details rather than asking Vineet for what's already documented.
 
 ### Google (personal + work)
 - **Calendar** — `python3 tools/gcal.py <cmd>` · info: `services/google/calendar_info.md`
-  When telling Vineet about an event, include its link (the 🔗 in tool output, or
-  `link` field from `json-today`) on its own line — WhatsApp makes it tappable.
+  When telling Vineet about an event, include its link on its own line (WhatsApp
+  makes raw URLs tappable). **Shorten long links first** with
+  `python3 tools/shorten.py <url> [url2 ...]` (batch multiple at once) — calendar
+  links are non-sensitive. Never shorten secret/auth URLs via this public tool.
 - **Gmail** — `python3 tools/gmail.py <cmd>` · list/unread/search/read/send
 - **Drive** — `python3 tools/gdrive.py <cmd>` · info: `services/google/drive_info.md`
 - **Contacts** — `python3 tools/gcontacts.py <cmd>` · info: `services/google/contacts_info.md`
