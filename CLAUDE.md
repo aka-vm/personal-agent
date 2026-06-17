@@ -61,6 +61,9 @@ when you need details rather than asking Vineet for what's already documented.
   makes raw URLs tappable). **Shorten long links first** with
   `python3 tools/shorten.py <url> [url2 ...]` (batch multiple at once) — calendar
   links are non-sensitive. Never shorten secret/auth URLs via this public tool.
+  **RSVP emoji** (from the `rsvp` field): ✅ accepted · 🤔 maybe (tentative) ·
+  ❔ none (not responded) · ❌ declined. Show it before each event. List any
+  **declined events at the very end**, grouped under "Declined".
 - **Gmail** — `python3 tools/gmail.py <cmd>` · list/unread/search/read/send
 - **Drive** — `python3 tools/gdrive.py <cmd>` · info: `services/google/drive_info.md`
 - **Contacts** — `python3 tools/gcontacts.py <cmd>` · info: `services/google/contacts_info.md`

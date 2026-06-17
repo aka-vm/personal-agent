@@ -31,6 +31,18 @@ def get_service(account):
             f.write(creds.to_json())
     return build("calendar", "v3", credentials=creds)
 
+RSVP_EMOJI = {"accepted": "✅", "tentative": "🤔", "declined": "❌", "needsAction": "❔"}
+
+
+def rsvp_status(event):
+    """The user's own RSVP on this event: accepted/tentative/declined/needsAction,
+    or None for solo/own events with no invitee status."""
+    for a in event.get("attendees", []):
+        if a.get("self"):
+            return a.get("responseStatus")
+    return None
+
+
 def format_event(event, account_label=""):
     start = event["start"].get("dateTime", event["start"].get("date", ""))
     end   = event["end"].get("dateTime", event["end"].get("date", ""))
@@ -45,7 +57,9 @@ def format_event(event, account_label=""):
     except:
         time_str = start
 
-    line = f"{label}{time_str}  |  {title}"
+    emoji = RSVP_EMOJI.get(rsvp_status(event), "")
+    prefix = f"{emoji} " if emoji else ""
+    line = f"{prefix}{label}{time_str}  |  {title}"
     if loc:
         line += f"\n    📍 {loc}"
     link = event.get("htmlLink", "")
@@ -110,6 +124,7 @@ def cmd_json_today(accounts):
                 "all_day": all_day,
                 "location": e.get("location", ""),
                 "link": e.get("htmlLink", ""),
+                "rsvp": rsvp_status(e),
             })
     print(_json.dumps(out))
 
