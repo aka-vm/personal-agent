@@ -14,7 +14,10 @@ import re
 import sys
 import json
 import time
+import uuid
+import threading
 import urllib.request
+from dotenv import dotenv_values
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from core.agent import handle
@@ -42,6 +45,12 @@ def to_whatsapp(md: str) -> str:
     return text.strip()
 
 BRIDGE = config.get("whatsapp.bridge_url", "http://localhost:3001")
+# /data inside the container maps to this host path
+CONTAINER_DATA = "/data"
+HOST_DATA = "/mnt/ssd/rpi_storage/whatsapp-baileys"
+
+_secrets = dotenv_values(os.path.expanduser("~/.config/agent/secrets.env"))
+GROQ_KEY = _secrets.get("GROQ_API_KEY") or os.environ.get("GROQ_API_KEY")
 CHAT_GROUP = config.get("whatsapp.chat_group")
 CONV_KEY = "whatsapp:rpibot"
 POLL_INTERVAL = 3
@@ -77,11 +86,30 @@ def api_post(path, body):
 
 
 def reply_text(message):
-    api_post("/send-group", {"groupId": CHAT_GROUP, "message": message})
+    r = api_post("/send-group", {"groupId": CHAT_GROUP, "message": message})
+    return r.get("key") if r else None
 
 
 def reply_file(path):
     api_post("/send-file", {"groupId": CHAT_GROUP, "filePath": path.strip()})
+
+
+def edit_message(key, message):
+    """Edit a previously-sent message in place (key from reply_text)."""
+    if key:
+        api_post("/edit", {"groupId": CHAT_GROUP, "key": key, "message": message})
+
+
+def set_presence(state):
+    """state: composing (typing…) | paused | available"""
+    api_post("/presence", {"groupId": CHAT_GROUP, "state": state})
+
+
+def react_to(msg, emoji):
+    """React to an incoming group message (msg = a /messages entry)."""
+    api_post("/react", {"groupId": CHAT_GROUP, "id": msg.get("id"),
+                        "participant": msg.get("participant"), "fromMe": False,
+                        "emoji": emoji})
 
 
 def load_offset():
@@ -97,16 +125,89 @@ def save_offset(ts):
     json.dump({"last_ts": ts}, open(STATE_FILE, "w"))
 
 
+def transcribe_voice(container_path: str) -> str | None:
+    if not GROQ_KEY:
+        print("[whatsapp] no GROQ_API_KEY — cannot transcribe voice")
+        return None
+    host_path = container_path.replace(CONTAINER_DATA, HOST_DATA, 1)
+    if not os.path.isfile(host_path):
+        print(f"[whatsapp] voice file not found: {host_path}")
+        return None
+    with open(host_path, "rb") as f:
+        audio_data = f.read()
+    boundary = uuid.uuid4().hex
+    body = (
+        f"--{boundary}\r\n"
+        f'Content-Disposition: form-data; name="model"\r\n\r\n'
+        f"whisper-large-v3\r\n"
+        f"--{boundary}\r\n"
+        f'Content-Disposition: form-data; name="language"\r\n\r\n'
+        f"en\r\n"
+        f"--{boundary}\r\n"
+        f'Content-Disposition: form-data; name="prompt"\r\n\r\n'
+        f"Voice message to an AI assistant. Indian English.\r\n"
+        f"--{boundary}\r\n"
+        f'Content-Disposition: form-data; name="file"; filename="voice.ogg"\r\n'
+        f"Content-Type: audio/ogg\r\n\r\n"
+    ).encode() + audio_data + f"\r\n--{boundary}--\r\n".encode()
+    req = urllib.request.Request(
+        "https://api.groq.com/openai/v1/audio/transcriptions",
+        data=body,
+        method="POST",
+        headers={
+            "Authorization": f"Bearer {GROQ_KEY}",
+            "Content-Type": f"multipart/form-data; boundary={boundary}",
+            # Groq is behind Cloudflare, which 403s urllib's default User-Agent.
+            "User-Agent": "curl/8.0",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as r:
+            transcript = json.loads(r.read()).get("text", "").strip()
+            print(f"[whatsapp] transcribed: {transcript[:80]}")
+            return transcript
+    except Exception as e:
+        print(f"[whatsapp] transcription error: {e}")
+        return None
+
+
 def process(text):
-    reply_text("⏳ ...")
-    reply = handle(text, CONV_KEY, extra_system=EXTRA_SYSTEM)
+    # Send a placeholder we'll EDIT in place into the final answer, and show
+    # "typing…" (kept alive on a timer) while claude is thinking.
+    key = reply_text("⏳ ...")
+    set_presence("composing")
+    stop = threading.Event()
+
+    def _keep_typing():
+        while not stop.wait(8):       # WhatsApp clears typing after ~25s; refresh it
+            set_presence("composing")
+
+    t = threading.Thread(target=_keep_typing, daemon=True)
+    t.start()
+    try:
+        reply = handle(text, CONV_KEY, extra_system=EXTRA_SYSTEM)
+    finally:
+        stop.set()
+        set_presence("paused")
+
     if reply.error:
-        reply_text(f"⚠️ {reply.error}")
+        msg = f"⚠️ {reply.error}"
+        edit_message(key, msg) if key else reply_text(msg)
         return
+
     if reply.text:
         formatted = to_whatsapp(reply.text)
-        for i in range(0, len(formatted), 4000):
-            reply_text(formatted[i:i + 4000])
+        chunks = [formatted[i:i + 4000] for i in range(0, len(formatted), 4000)] or [""]
+        # Edit the placeholder into the first chunk; send any overflow as new messages.
+        if key:
+            edit_message(key, chunks[0])
+        else:
+            reply_text(chunks[0])
+        for c in chunks[1:]:
+            reply_text(c)
+    elif key:
+        edit_message(key, "✅")        # no text (e.g. file-only reply) — clear the ⏳
+
     for path in reply.files:
         if os.path.isfile(path):
             reply_file(path)
@@ -131,15 +232,24 @@ def main():
 
             for m in sorted(new, key=lambda x: x.get("timestamp", 0)):
                 txt = (m.get("text") or "").strip()
+                voice_path = m.get("voicePath")
+
+                # transcribe voice if no text but voice file present
+                if not txt and voice_path:
+                    transcript = transcribe_voice(voice_path)
+                    if transcript:
+                        txt = f"[Voice message]: {transcript}"
+
                 if txt:
                     quoted = (m.get("quoted") or "").strip()
                     if quoted:
-                        # give the agent the message Vineet replied to, for context
                         full = f'(In reply to: "{quoted[:500]}")\n\n{txt}'
                     else:
                         full = txt
                     print(f"[whatsapp] << {txt[:80]}" + (" [reply]" if quoted else ""))
+                    react_to(m, "👀")     # acknowledge receipt
                     process(full)
+                    react_to(m, "✅")     # done
                 last_ts = max(last_ts, m.get("timestamp", 0))
                 save_offset(last_ts)
         except Exception as e:

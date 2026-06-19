@@ -191,7 +191,7 @@ async function connect() {
   sock.ev.on('contacts.upsert', upsertContacts)
   sock.ev.on('contacts.update', upsertContacts)
 
-  sock.ev.on('messages.upsert', ({ messages, type }) => {
+  sock.ev.on('messages.upsert', async ({ messages, type }) => {
     if (type !== 'notify') return
     for (const msg of messages) {
       if (!msg.message) continue
@@ -208,6 +208,25 @@ async function connect() {
         msg.message.extendedTextMessage?.text ||
         msg.message.imageMessage?.caption ||
         ''
+
+      // voice notes (ptt) / audio: download & save so the agent can transcribe (Groq)
+      let voicePath = null
+      if (msg.message.audioMessage && !msg.key.fromMe) {
+        try {
+          const buf = await downloadMediaMessage(
+            msg, 'buffer', {},
+            { logger: pino({ level: 'silent' }), reuploadRequest: sock.updateMediaMessage }
+          )
+          const voiceDir = path.join(DATA_DIR, 'voice')
+          fs.mkdirSync(voiceDir, { recursive: true })
+          voicePath = path.join(voiceDir, `${msg.key.id}.ogg`)
+          fs.writeFileSync(voicePath, buf)
+          console.log(`[wa] saved voice ${voicePath} (${buf.length} bytes)`)
+        } catch (e) {
+          console.log('[wa] voice download failed:', e.message)
+        }
+      }
+
       // capture quoted/replied-to message text for context
       const q = msg.message.extendedTextMessage?.contextInfo?.quotedMessage
       const quoted = q
@@ -216,11 +235,13 @@ async function connect() {
         : ''
       const entry = {
         id: msg.key.id,
+        participant: msg.key.participant || null,  // group sender — needed to react to this msg
         from: remoteJid,
         fromMe: msg.key.fromMe,
         pushName: msg.pushName || null,
         text,
         quoted,
+        voicePath,
         timestamp: Number(msg.messageTimestamp),
       }
       recentMessages.unshift(entry)
@@ -262,7 +283,7 @@ app.post('/send', async (req, res) => {
   if (!phone || !message) return res.status(400).json({ error: 'phone and message required' })
   try {
     const targetJid = jid(phone)
-    await sock.sendMessage(targetJid, { text: message })
+    const sent = await sock.sendMessage(targetJid, { text: message })
     // track that we've texted this contact
     if (!textedContacts.has(targetJid)) {
       textedContacts.set(targetJid, 0)
@@ -278,7 +299,7 @@ app.post('/send', async (req, res) => {
       }
       logToGroup(`📤 To *${contactName}* (+${phone}):\n${message}`)
     }
-    res.json({ ok: true })
+    res.json({ ok: true, key: sent?.key })
   } catch (e) {
     res.status(500).json({ error: e.message })
   }
@@ -289,7 +310,51 @@ app.post('/send-group', async (req, res) => {
   if (!isConnected) return res.status(503).json({ error: 'not_connected' })
   if (!groupId || !message) return res.status(400).json({ error: 'groupId and message required' })
   try {
-    await sock.sendMessage(jid(groupId), { text: message })
+    const sent = await sock.sendMessage(jid(groupId), { text: message })
+    res.json({ ok: true, key: sent?.key })
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
+
+// Edit a previously-sent message in place (key from /send or /send-group).
+// WhatsApp allows editing your own text message for ~15 min after sending.
+app.post('/edit', async (req, res) => {
+  const { groupId, phone, key, message } = req.body
+  if (!isConnected) return res.status(503).json({ error: 'not_connected' })
+  if (!key || !message) return res.status(400).json({ error: 'key and message required' })
+  try {
+    const target = groupId ? jid(groupId) : jid(phone)
+    await sock.sendMessage(target, { text: message, edit: key })
+    res.json({ ok: true })
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
+
+// Typing indicator: state = composing | paused | available
+app.post('/presence', async (req, res) => {
+  const { groupId, phone, state = 'composing' } = req.body
+  if (!isConnected) return res.status(503).json({ error: 'not_connected' })
+  try {
+    const target = groupId ? jid(groupId) : jid(phone)
+    await sock.sendPresenceUpdate(state, target)
+    res.json({ ok: true })
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
+
+// React to a message. Pass emoji '' to remove the reaction.
+app.post('/react', async (req, res) => {
+  const { groupId, phone, id, participant, fromMe = false, emoji = '' } = req.body
+  if (!isConnected) return res.status(503).json({ error: 'not_connected' })
+  if (!id) return res.status(400).json({ error: 'id required' })
+  try {
+    const remoteJid = groupId ? jid(groupId) : jid(phone)
+    const key = { remoteJid, id, fromMe }
+    if (participant) key.participant = participant
+    await sock.sendMessage(remoteJid, { react: { text: emoji, key } })
     res.json({ ok: true })
   } catch (e) {
     res.status(500).json({ error: e.message })
