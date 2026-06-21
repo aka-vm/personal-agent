@@ -9,7 +9,7 @@ import sys, os, json, time
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from core.config import config
-from notify import send_telegram
+from notify import send_whatsapp
 
 STATE_FILE = os.path.join(config.state_dir, "alert_state.json")
 COOLDOWN   = 2 * 60 * 60  # 2 hours between same alert
@@ -23,7 +23,7 @@ THRESHOLDS = {
 }
 
 def tg_send(msg):
-    return send_telegram(msg)
+    return send_whatsapp(msg)
 
 def load_state():
     if os.path.exists(STATE_FILE):
@@ -69,6 +69,7 @@ def check(force=False):
     state = load_state()
     now   = time.time()
     alerts = []
+    pct_root = pct_ssd = ram_pct = swap_pct = load = 0.0  # safe defaults if checks fail
 
     # Disk /
     _, total_root, pct_root = disk_usage("/")

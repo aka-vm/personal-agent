@@ -44,8 +44,10 @@ def cmd_search(query, count=8):
     print(f"\n── Web: '{query}' ({len(results)}) ──")
     if not results:
         print("  No results.")
+    print("<external>")
     for r in results:
         print(f"\n• {_clean(r.get('title',''))}\n  {r.get('url','')}\n  {_clean(r.get('description',''))[:200]}")
+    print("</external>")
 
 
 def cmd_news(query, count=8):
@@ -54,8 +56,10 @@ def cmd_news(query, count=8):
     print(f"\n── News: '{query}' ({len(results)}) ──")
     if not results:
         print("  No results.")
+    print("<external>")
     for r in results:
         print(f"\n• {_clean(r.get('title',''))}  ({r.get('age','')})\n  {r.get('url','')}\n  {_clean(r.get('description',''))[:200]}")
+    print("</external>")
 
 
 if __name__ == "__main__":

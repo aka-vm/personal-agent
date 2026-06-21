@@ -114,6 +114,9 @@ When he gives the go-ahead ("review" / "go"):
 - First tell him *what* you'll review, then proceed end-to-end across the repo:
   **stability/reliability, reducing complexity, system + LLM-usage optimization,
   good engineering practices, and a bug scan.**
+- Also review all `.md` files in the repo (CLAUDE.md, memory/MEMORY.md, services/*/info.md,
+  etc.) — check if any instructions are outdated, missing context, or could be improved
+  to make the agent work better. Update them if needed.
 - Fix P0/P1 issues (confirm anything risky/outward-facing first); log P2+ in
   `memory/MEMORY.md` backlog. Aim: more stable, simpler, cheaper to run.
 - When done, run `python3 tasks/review_done.py "<one-line summary>"` — it

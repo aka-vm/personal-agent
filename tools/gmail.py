@@ -134,9 +134,11 @@ def cmd_read(account, msg_id):
         if line.startswith(">") or re.match(r"On .+ wrote:", line):
             break
         trimmed.append(line)
+    print("<external>")
     print("\n".join(trimmed[:80]))
     if len(trimmed) > 80:
         print(f"\n... ({len(trimmed) - 80} more lines)")
+    print("</external>")
     # mark as read
     svc.users().messages().modify(
         userId="me", id=msg_id, body={"removeLabelIds": ["UNREAD"]}
