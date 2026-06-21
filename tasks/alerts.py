@@ -115,8 +115,6 @@ def check(force=False):
         msg = "⚠️ *Pi System Alert*\n\n" + "\n".join(alerts)
         tg_send(msg)
         print(f"Sent {len(alerts)} alert(s)")
-    else:
-        print(f"All OK — disk root={pct_root:.0f}% ssd={pct_ssd:.0f}% ram={ram_pct:.0f}% load={load:.2f}")
 
     save_state(state)
 

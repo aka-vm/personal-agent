@@ -171,6 +171,24 @@ def transcribe_voice(container_path: str) -> str | None:
         return None
 
 
+def _split_message(text: str, limit: int = 4000) -> list[str]:
+    """Split at paragraph boundaries to avoid cutting mid-word."""
+    if len(text) <= limit:
+        return [text]
+    chunks = []
+    while len(text) > limit:
+        cut = text.rfind("\n\n", 0, limit)
+        if cut == -1:
+            cut = text.rfind("\n", 0, limit)
+        if cut == -1:
+            cut = limit
+        chunks.append(text[:cut].strip())
+        text = text[cut:].strip()
+    if text:
+        chunks.append(text)
+    return chunks
+
+
 def process(text):
     # Send a placeholder we'll EDIT in place into the final answer, and show
     # "typing…" (kept alive on a timer) while claude is thinking.
@@ -197,7 +215,7 @@ def process(text):
 
     if reply.text:
         formatted = to_whatsapp(reply.text)
-        chunks = [formatted[i:i + 4000] for i in range(0, len(formatted), 4000)] or [""]
+        chunks = _split_message(formatted) or [""]
         # Edit the placeholder into the first chunk; send any overflow as new messages.
         if key:
             edit_message(key, chunks[0])

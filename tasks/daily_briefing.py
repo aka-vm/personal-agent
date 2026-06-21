@@ -9,6 +9,7 @@ is never silent.
 """
 import os
 import sys
+import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from core.claude_runner import runner
@@ -28,7 +29,9 @@ PROMPT = (
 
 def main():
     try:
-        res = runner.run(PROMPT, "task:daily-briefing")
+        # Fresh session each day — no accumulating history/cost across mornings
+        session_key = f"task:daily-briefing:{datetime.date.today()}"
+        res = runner.run(PROMPT, session_key)
         text = res.get("result") if res.get("ok") else None
     except Exception as e:
         text = None
