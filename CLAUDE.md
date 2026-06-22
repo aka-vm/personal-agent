@@ -69,6 +69,9 @@ when you need details rather than asking Vineet for what's already documented.
   ❔ none (not responded) · ❌ declined. Show it before each event. List any
   **declined events at the very end**, grouped under "Declined".
 - **Gmail** — `python3 tools/gmail.py <cmd>` · list/unread/search/read/send
+- **Proton email (send-only)** — `python3 tools/email_send.py <to> "<subject>" "<body>"` · sends from
+  the anonymous Proton account via the local hydroxide SMTP bridge. Outbound only; use Gmail for
+  inbox/replies. Confirm with Vineet before emailing other people (same rule as WhatsApp).
 - **Drive** — `python3 tools/gdrive.py <cmd>` · info: `services/google/drive_info.md`
 - **Contacts** — `python3 tools/gcontacts.py <cmd>` · info: `services/google/contacts_info.md`
 

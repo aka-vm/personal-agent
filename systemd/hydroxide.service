@@ -1,0 +1,12 @@
+[Unit]
+Description=Hydroxide — Proton SMTP bridge (local 127.0.0.1:1025) for the agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/home/vineet/go/bin/hydroxide smtp
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target
