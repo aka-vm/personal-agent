@@ -30,6 +30,7 @@
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
   .spin{width:13px;height:13px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:sp .7s linear infinite}
   @keyframes sp{to{transform:rotate(360deg)}}
+  .sec{margin:24px 0 4px;font-size:.72rem;color:var(--mut);text-transform:uppercase;letter-spacing:.09em;font-weight:700}
   .foot{color:var(--mut);font-size:.78rem;margin-top:20px;line-height:1.55}
 </style></head><body>
 <h1>⚙️ Vineet's Hub</h1>
@@ -41,6 +42,9 @@
 </div>
 
 <div id="services"></div>
+
+<div class="sec">Apps</div>
+<div id="apps"></div>
 
 <div class="foot"><b>Open</b> launches the service on your tailnet. <b>Stop optional</b> idles
 non-core services (Home Assistant &amp; WhatsApp bridge always stay up).</div>
@@ -82,5 +86,20 @@ async function g(a,btn){
   await fetch('/api/global/'+a,{method:'POST'});
   setTimeout(()=>{ btn.disabled=false; btn.innerHTML=t; load(); }, 2800);
 }
+// Always-on static apps (served by Tailscale, not Docker — no start/stop).
+const APPS = [
+  {label:'STFU', url:'https://vineet.werewolf-platy.ts.net:8443/', note:'mic playback, ~2s delay'},
+];
+function renderApps(){
+  document.getElementById('apps').innerHTML = APPS.map(a => `<div class="card">
+    <div class="head">
+      <span class="dot up"></span>
+      <span class="nm">${a.label}</span>
+      <span class="state">${a.note||''}</span>
+    </div>
+    <div class="row"><a class="open" href="${a.url}" target="_blank">🔗 Open</a></div>
+  </div>`).join('');
+}
+renderApps();
 load(); setInterval(()=>{ if(!Object.keys(pending).length) load(); }, 8000);
 </script></body></html>
