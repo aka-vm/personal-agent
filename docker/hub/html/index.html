@@ -31,6 +31,7 @@
   .spin{width:13px;height:13px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:sp .7s linear infinite}
   @keyframes sp{to{transform:rotate(360deg)}}
   .sec{margin:24px 0 4px;font-size:.72rem;color:var(--mut);text-transform:uppercase;letter-spacing:.09em;font-weight:700}
+  .sel{width:100%;height:40px;border-radius:10px;background:var(--card2);color:var(--txt);border:1px solid var(--line);padding:0 10px;font:inherit;font-size:.85rem;appearance:none;-webkit-appearance:none}
   .foot{color:var(--mut);font-size:.78rem;margin-top:20px;line-height:1.55}
 </style></head><body>
 <h1>⚙️ Vineet's Hub</h1>
@@ -44,6 +45,26 @@
 <div id="services"></div>
 
 <div class="sec">Apps</div>
+<div class="card">
+  <div class="head">
+    <span class="dot up"></span>
+    <span class="nm">📞 Escape call</span>
+    <span class="state" id="esc-state">pick when to ring</span>
+  </div>
+  <select id="esc-scenario" class="sel">
+    <option value="generic">Friend — "need to talk"</option>
+    <option value="mom">Mom — "come home"</option>
+    <option value="boss">Boss — "urgent at work"</option>
+    <option value="reminder">Reminder — "leave now"</option>
+  </select>
+  <select id="esc-phone" class="sel" style="margin-top:8px"></select>
+  <div class="row" style="margin-top:10px">
+    <button onclick="escape(15,this)">15s</button>
+    <button onclick="escape(60,this)">1 min</button>
+    <button onclick="escape(120,this)">2 min</button>
+    <button onclick="escape(300,this)">5 min</button>
+  </div>
+</div>
 <div id="apps"></div>
 
 <div class="foot"><b>Open</b> launches the service on your tailnet. <b>Stop optional</b> idles
@@ -55,6 +76,11 @@ const url = p => `http://${location.hostname}:${p}`;
 
 async function load(){
   const S = await (await fetch('/api/status')).json();
+  const ph = document.getElementById('esc-phone');
+  if (ph && S.phones && !ph.dataset.filled){
+    ph.innerHTML = S.phones.map(p=>`<option value="${p.id}">📱 ${p.label}</option>`).join('');
+    ph.dataset.filled = '1';
+  }
   const wrap = document.getElementById('services'); wrap.innerHTML = '';
   for (const [k,v] of Object.entries(S.services||{})){
     const up = v.state==='up', pend = pending[k];
@@ -86,6 +112,21 @@ async function g(a,btn){
   await fetch('/api/global/'+a,{method:'POST'});
   setTimeout(()=>{ btn.disabled=false; btn.innerHTML=t; load(); }, 2800);
 }
+async function escape(delay, btn){
+  const scenario = document.getElementById('esc-scenario').value;
+  const phone = document.getElementById('esc-phone').value;
+  const st = document.getElementById('esc-state');
+  const t = btn.textContent; btn.disabled = true; btn.innerHTML = '<span class=spin></span>';
+  try{
+    const r = await fetch('/api/escape-call', {method:'POST',
+      headers:{'Content-Type':'application/json'}, body: JSON.stringify({delay, scenario, phone})});
+    const j = await r.json();
+    st.textContent = j.ok ? `📞 ringing in ${delay<60?delay+'s':delay/60+' min'}…`
+                          : ('⚠️ ' + (j.error || 'failed'));
+  }catch(e){ st.textContent = '⚠️ error'; }
+  btn.disabled = false; btn.textContent = t;
+}
+
 // Always-on static apps (served by Tailscale, not Docker — no start/stop).
 const APPS = [
   {label:'STFU', url:'https://vineet.werewolf-platy.ts.net:8443/', note:'mic playback, ~2s delay'},
