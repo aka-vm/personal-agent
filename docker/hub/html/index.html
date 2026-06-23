@@ -130,7 +130,7 @@ async function escape(delay, btn){
 // Always-on static apps (served by Tailscale, not Docker — no start/stop).
 const APPS = [
   {label:'STFU', url:'https://vineet.werewolf-platy.ts.net:8443/', note:'mic playback, ~2s delay'},
-  {label:'Encoder · Decoder', url:'https://vineet.werewolf-platy.ts.net:8443/encoder/', note:'encode / decode text'},
+  {label:'Encoder · Decoder', url:'https://vineet.werewolf-platy.ts.net:8444/', note:'encode / decode text'},
 ];
 function renderApps(){
   document.getElementById('apps').innerHTML = APPS.map(a => `<div class="card">
