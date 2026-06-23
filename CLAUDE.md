@@ -113,6 +113,10 @@ when you need details rather than asking Vineet for what's already documented.
   (brings the off-by-default browser up; reaper stops it after ~15 min).
 - **Hub dashboard & personal apps** — when working on the dashboard or adding/serving an
   app, read `docs/dashboard-apps.md` (how apps are hosted on per-app Tailscale HTTPS ports).
+- **Escape call** — when Vineet says "call me" / wants a fake call to escape a situation,
+  ring his phone via Twilio:
+  `ESCAPE_CALL_ENV=~/.config/agent/secrets.env python3 /home/vineet/escape-call/server.py call --delay 0 [--scenario boss|mom|reminder]`
+  Default rings his primary number; `--to +91…` for the other. He wants it — no confirm needed.
 
 ## Weekly system review
 A daily nudge (`review_nudge`) reminds Vineet when a review is due (>=7 days).
