@@ -109,6 +109,10 @@ when you need details rather than asking Vineet for what's already documented.
   for looking things up) · info: `services/web/info.md`
 - **Browser (Playwright MCP)** — `mcp__playwright__*` for *interacting* with pages
   (forms, login, JS scraping). Slow on the Pi — prefer Brave for plain search.
+  To screenshot/debug a page: `bash /home/vineet/playwright-mcp/shot.sh <url> [out.png]`
+  (brings the off-by-default browser up; reaper stops it after ~15 min).
+- **Hub dashboard & personal apps** — when working on the dashboard or adding/serving an
+  app, read `docs/dashboard-apps.md` (how apps are hosted on per-app Tailscale HTTPS ports).
 
 ## Weekly system review
 A daily nudge (`review_nudge`) reminds Vineet when a review is due (>=7 days).
