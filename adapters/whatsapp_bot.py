@@ -189,6 +189,21 @@ def _split_message(text: str, limit: int = 4000) -> list[str]:
     return chunks
 
 
+# Conservative model routing: only obvious chit-chat (greetings/acks/thanks) goes
+# to the cheap model. Anything with a "?" or a task verb stays on the default
+# (stronger) model — we only ever DOWNgrade when it's clearly safe. No extra LLM call.
+_TRIVIAL = re.compile(
+    r'^(hi+|hey+|hello|yo|ok(ay)?|kk|thx|thanks?|thank you|ty|cool|nice|great|'
+    r'done|got ?it|gotcha|haha+|lol|gm|gn|good ?(morning|night|evening|afternoon)|'
+    r'sup|np|no problem|👍|🙏|🙌|😄|😂)[!.\s]*$', re.I)
+
+def pick_model(text):
+    t = (text or "").strip()
+    if len(t) <= 40 and "?" not in t and _TRIVIAL.match(t):
+        return config.cheap_model      # trivial → Haiku
+    return None                         # everything else → default (Sonnet)
+
+
 def process(text):
     # Send a placeholder we'll EDIT in place into the final answer, and show
     # "typing…" (kept alive on a timer) while claude is thinking.
@@ -203,7 +218,7 @@ def process(text):
     t = threading.Thread(target=_keep_typing, daemon=True)
     t.start()
     try:
-        reply = handle(text, CONV_KEY, extra_system=EXTRA_SYSTEM)
+        reply = handle(text, CONV_KEY, extra_system=EXTRA_SYSTEM, model=pick_model(text))
     finally:
         stop.set()
         set_presence("paused")
