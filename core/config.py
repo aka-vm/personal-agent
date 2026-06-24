@@ -53,6 +53,10 @@ class Config:
     def timeout(self):      return int(self.get("agent.timeout", 600))
     @property
     def session_timeout(self): return int(self.get("agent.session_timeout", 0))
+    @property
+    def session_max_age(self): return int(self.get("agent.session_max_age", 0))
+    @property
+    def cheap_model(self):  return self.get("agent.cheap_model", "claude-haiku-4-5")
 
 
 # singleton

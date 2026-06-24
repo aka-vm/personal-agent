@@ -13,6 +13,7 @@ import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from core.claude_runner import runner
+from core.config import config
 from notify import send_whatsapp
 
 PROMPT = (
@@ -29,9 +30,10 @@ PROMPT = (
 
 def main():
     try:
-        # Fresh session each day — no accumulating history/cost across mornings
+        # Fresh session each day — no accumulating history/cost across mornings.
+        # Low-energy summarization task → cheap model (has a deterministic fallback below).
         session_key = f"task:daily-briefing:{datetime.date.today()}"
-        res = runner.run(PROMPT, session_key)
+        res = runner.run(PROMPT, session_key, model=config.cheap_model)
         text = res.get("result") if res.get("ok") else None
     except Exception as e:
         text = None

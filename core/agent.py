@@ -32,7 +32,7 @@ def _path_allowed(path: str) -> bool:
     return any(real.startswith(d) for d in ALLOWED_SEND_DIRS)
 
 
-def handle(text: str, conv_key: str, extra_system: str | None = None) -> Reply:
+def handle(text: str, conv_key: str, extra_system: str | None = None, model: str | None = None) -> Reply:
     text = (text or "").strip()
     if not text:
         return Reply()
@@ -58,7 +58,7 @@ def handle(text: str, conv_key: str, extra_system: str | None = None) -> Reply:
         ))
 
     # ── run the turn ─────────────────────────────────────────────────────────
-    res = runner.run(text, conv_key, extra_system=extra_system)
+    res = runner.run(text, conv_key, extra_system=extra_system, model=model)
     if not res["ok"]:
         return Reply(error=res["error"])
 

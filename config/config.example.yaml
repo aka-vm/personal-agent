@@ -5,13 +5,19 @@ agent:
   # Model the bot uses for each turn. Sonnet is the cost/speed sweet spot for a
   # 24/7 assistant; switch to claude-opus-4-8 only if you need heavier reasoning.
   model: "claude-sonnet-4-6"
+  # Cheaper model for low-energy tasks (briefing, summaries, classification) to
+  # save tokens. Callers opt in via handle(..., model=config.cheap_model).
+  cheap_model: "claude-haiku-4-5"
   # Working directory the `claude` CLI runs in. CLAUDE.md and memory are keyed
   # to this path. Should be the repo root.
   work_dir: "/home/vineet/agent"
   # Per-turn timeout in seconds.
   timeout: 600
-  # Reset a conversation after this many seconds of inactivity (0 = never).
-  session_timeout: 0
+  # Reset a conversation after this many seconds of silence (0 = never). Bounds
+  # context growth — each conversation burst becomes its own session.
+  session_timeout: 21600          # 6h
+  # Hard cap on total session age; fresh session after this even in active chats.
+  session_max_age: 86400          # 24h
 
 telegram:
   enabled: true

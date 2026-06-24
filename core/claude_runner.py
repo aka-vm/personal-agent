@@ -40,6 +40,7 @@ class ClaudeRunner:
         self.work_dir = config.work_dir
         self.timeout = config.timeout
         self.session_timeout = config.session_timeout
+        self.session_max_age = config.session_max_age
 
     # ── session bookkeeping ──────────────────────────────────────────────────
 
@@ -48,13 +49,23 @@ class ClaudeRunner:
         entry = sessions.get(conv_key)
         if not entry:
             return None
-        if self.session_timeout and (time.time() - entry.get("last_ts", 0)) > self.session_timeout:
-            return None  # expired → fresh session
+        now = time.time()
+        # reset on long silence — keeps each conversation burst self-contained
+        if self.session_timeout and (now - entry.get("last_ts", 0)) > self.session_timeout:
+            return None
+        # hard cap on total session age — bounds context growth even in active chats
+        if self.session_max_age and (now - entry.get("started_ts", now)) > self.session_max_age:
+            return None
         return entry.get("session_id")
 
     def _store_session_id(self, conv_key: str, session_id: str):
         sessions = _load_sessions()
-        sessions[conv_key] = {"session_id": session_id, "last_ts": time.time()}
+        prev = sessions.get(conv_key, {})
+        # keep the original start time while the same session continues; new id resets it
+        started = prev.get("started_ts") if prev.get("session_id") == session_id else None
+        sessions[conv_key] = {"session_id": session_id,
+                              "started_ts": started or time.time(),
+                              "last_ts": time.time()}
         _save_sessions(sessions)
 
     def reset(self, conv_key: str):
@@ -66,10 +77,10 @@ class ClaudeRunner:
 
     # ── invocation ───────────────────────────────────────────────────────────
 
-    def _invoke(self, text: str, session_id: str, resume: bool, extra_system: str | None):
+    def _invoke(self, text: str, session_id: str, resume: bool, extra_system: str | None, model: str | None = None):
         cmd = [
             CLAUDE_BIN, "-p", text,
-            "--model", self.model,
+            "--model", model or self.model,
             "--output-format", "json",
             "--permission-mode", "bypassPermissions",
         ]
@@ -86,7 +97,7 @@ class ClaudeRunner:
         )
         return proc
 
-    def run(self, text: str, conv_key: str, extra_system: str | None = None) -> dict:
+    def run(self, text: str, conv_key: str, extra_system: str | None = None, model: str | None = None) -> dict:
         """
         Run one turn. Returns {ok, result, session_id, cost, error}.
         Resumes the conversation's session if one exists, else starts a new one.
@@ -98,12 +109,12 @@ class ClaudeRunner:
             session_id = str(uuid.uuid4())
 
         try:
-            proc = self._invoke(text, session_id, resume, extra_system)
+            proc = self._invoke(text, session_id, resume, extra_system, model)
             # If resume failed (stale/missing session), retry once with a new session.
             if resume and proc.returncode != 0 and "session" in (proc.stderr or "").lower():
                 session_id = str(uuid.uuid4())
                 resume = False
-                proc = self._invoke(text, session_id, resume, extra_system)
+                proc = self._invoke(text, session_id, resume, extra_system, model)
         except subprocess.TimeoutExpired:
             return {"ok": False, "result": "", "session_id": session_id,
                     "cost": 0, "error": f"Timed out after {self.timeout}s"}
