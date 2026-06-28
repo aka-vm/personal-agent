@@ -18,6 +18,22 @@ from .config import config
 SEND_FILE_RE = re.compile(r'^SEND_FILE:(.+)$', re.MULTILINE)
 ALLOWED_SEND_DIRS = ["/mnt/ssd/", "/home/vineet/"]
 
+# Conservative model routing: only obvious chit-chat (greetings/acks/thanks) is
+# DOWNgraded to the cheap model. Anything with a "?" or a task verb stays on the
+# default (stronger) model — we only ever downgrade when it's clearly safe.
+_TRIVIAL_RE = re.compile(
+    r'^(hi+|hey+|hello|yo|ok(ay)?|kk|thx|thanks?|thank you|ty|cool|nice|great|'
+    r'done|got ?it|gotcha|haha+|lol|gm|gn|good ?(morning|night|evening|afternoon)|'
+    r'sup|np|no problem|👍|🙏|🙌|😄|😂)[!.\s]*$', re.I)
+
+
+def pick_model(text: str) -> str | None:
+    """Cheap model for trivial chit-chat, else None (adapter's default). No LLM call."""
+    t = (text or "").strip()
+    if len(t) <= 40 and "?" not in t and _TRIVIAL_RE.match(t):
+        return config.cheap_model
+    return None
+
 
 @dataclass
 class Reply:
@@ -32,10 +48,21 @@ def _path_allowed(path: str) -> bool:
     return any(real.startswith(d) for d in ALLOWED_SEND_DIRS)
 
 
-def handle(text: str, conv_key: str, extra_system: str | None = None, model: str | None = None) -> Reply:
+def handle(text: str, conv_key: str, extra_system: str | None = None, model: str | None = None,
+           allowed_tools=None, work_dir: str | None = None) -> Reply:
     text = (text or "").strip()
     if not text:
         return Reply()
+
+    # Restricted (untrusted group) turns skip the built-in owner commands entirely.
+    if allowed_tools is not None:
+        res = runner.run(text, conv_key, extra_system=extra_system, model=model,
+                         allowed_tools=allowed_tools, work_dir=work_dir)
+        if not res["ok"]:
+            return Reply(error=res["error"])
+        raw = res["result"]
+        # No SEND_FILE handling for restricted turns — they cannot deliver files.
+        return Reply(text=raw, cost=res.get("cost", 0))
 
     # ── built-in commands ────────────────────────────────────────────────────
     low = text.lower()

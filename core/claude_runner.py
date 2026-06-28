@@ -77,13 +77,20 @@ class ClaudeRunner:
 
     # ── invocation ───────────────────────────────────────────────────────────
 
-    def _invoke(self, text: str, session_id: str, resume: bool, extra_system: str | None, model: str | None = None):
+    def _invoke(self, text: str, session_id: str, resume: bool, extra_system: str | None,
+                model: str | None = None, allowed_tools=None, work_dir: str | None = None):
+        # Restricted mode (allowed_tools is a list, even empty): NON-bypass permission
+        # mode so anything not explicitly allowed is hard-denied — used for untrusted
+        # group turns. Empty list → talk only (no tools). None → full trusted (bypass).
+        restricted = allowed_tools is not None
         cmd = [
             CLAUDE_BIN, "-p", text,
             "--model", model or self.model,
             "--output-format", "json",
-            "--permission-mode", "bypassPermissions",
+            "--permission-mode", "default" if restricted else "bypassPermissions",
         ]
+        if allowed_tools:
+            cmd += ["--allowedTools", *allowed_tools]
         if resume:
             cmd += ["--resume", session_id]
         else:
@@ -93,11 +100,12 @@ class ClaudeRunner:
 
         proc = subprocess.run(
             cmd, capture_output=True, text=True,
-            cwd=self.work_dir, timeout=self.timeout,
+            cwd=work_dir or self.work_dir, timeout=self.timeout,
         )
         return proc
 
-    def run(self, text: str, conv_key: str, extra_system: str | None = None, model: str | None = None) -> dict:
+    def run(self, text: str, conv_key: str, extra_system: str | None = None, model: str | None = None,
+            allowed_tools=None, work_dir: str | None = None) -> dict:
         """
         Run one turn. Returns {ok, result, session_id, cost, error}.
         Resumes the conversation's session if one exists, else starts a new one.
@@ -109,12 +117,12 @@ class ClaudeRunner:
             session_id = str(uuid.uuid4())
 
         try:
-            proc = self._invoke(text, session_id, resume, extra_system, model)
+            proc = self._invoke(text, session_id, resume, extra_system, model, allowed_tools, work_dir)
             # If resume failed (stale/missing session), retry once with a new session.
             if resume and proc.returncode != 0 and "session" in (proc.stderr or "").lower():
                 session_id = str(uuid.uuid4())
                 resume = False
-                proc = self._invoke(text, session_id, resume, extra_system, model)
+                proc = self._invoke(text, session_id, resume, extra_system, model, allowed_tools, work_dir)
         except subprocess.TimeoutExpired:
             return {"ok": False, "result": "", "session_id": session_id,
                     "cost": 0, "error": f"Timed out after {self.timeout}s"}

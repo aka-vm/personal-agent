@@ -11,6 +11,8 @@ agent sends to *other* people (handled by the bridge).
 """
 import os
 import re
+import signal
+import subprocess
 import sys
 import json
 import time
@@ -20,8 +22,44 @@ import urllib.request
 from dotenv import dotenv_values
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from core.agent import handle
+from core.agent import handle, pick_model
 from core.config import config
+from core import group_access
+
+
+WORK_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+JIO_COMPLAINT = os.path.join(WORK_DIR, "tools", "jio_complaint.py")
+_JIO_MARKER_RE = re.compile(r'^(JIO_DRAFT|JIO_SEND):(.+)$', re.MULTILINE)
+
+
+def _process_jio_markers(text: str, group: str) -> str:
+    """Process JIO_DRAFT/JIO_SEND markers in Claude's reply — call jio_complaint.py
+    directly from the adapter (no Bash tool needed in the sandboxed session).
+    Returns the text with markers stripped."""
+    for m in _JIO_MARKER_RE.finditer(text):
+        action, payload = m.group(1), m.group(2).strip()
+        parts = payload.split("|", 1)
+        phone = parts[0].strip() if len(parts) == 2 else "unknown"
+        complaint = parts[1].strip() if len(parts) == 2 else payload
+
+        if action == "JIO_DRAFT":
+            r = subprocess.run([sys.executable, JIO_COMPLAINT, "draft", complaint, phone],
+                               capture_output=True, text=True, cwd=WORK_DIR)
+            if r.returncode == 0:
+                reply_text(f"*Draft email:*\n\n{r.stdout.strip()}\n\n"
+                           f"Reply *@bot approve* to send, or *@bot cancel* to discard.", group)
+            else:
+                reply_text(f"⚠️ Couldn't build draft: {r.stderr.strip()}", group)
+
+        elif action == "JIO_SEND":
+            r = subprocess.run([sys.executable, JIO_COMPLAINT, "send", complaint, phone],
+                               capture_output=True, text=True, cwd=WORK_DIR)
+            if r.returncode == 0:
+                reply_text("✅ Complaint email sent to JIO Fiber care.", group)
+            else:
+                reply_text(f"⚠️ Send failed: {r.stderr.strip() or r.stdout.strip()}", group)
+
+    return _JIO_MARKER_RE.sub("", text).strip()
 
 
 def to_whatsapp(md: str) -> str:
@@ -85,29 +123,29 @@ def api_post(path, body):
         return None
 
 
-def reply_text(message):
-    r = api_post("/send-group", {"groupId": CHAT_GROUP, "message": message})
+def reply_text(message, group=CHAT_GROUP):
+    r = api_post("/send-group", {"groupId": group, "message": message})
     return r.get("key") if r else None
 
 
-def reply_file(path):
-    api_post("/send-file", {"groupId": CHAT_GROUP, "filePath": path.strip()})
+def reply_file(path, group=CHAT_GROUP):
+    api_post("/send-file", {"groupId": group, "filePath": path.strip()})
 
 
-def edit_message(key, message):
+def edit_message(key, message, group=CHAT_GROUP):
     """Edit a previously-sent message in place (key from reply_text)."""
     if key:
-        api_post("/edit", {"groupId": CHAT_GROUP, "key": key, "message": message})
+        api_post("/edit", {"groupId": group, "key": key, "message": message})
 
 
-def set_presence(state):
+def set_presence(state, group=CHAT_GROUP):
     """state: composing (typing…) | paused | available"""
-    api_post("/presence", {"groupId": CHAT_GROUP, "state": state})
+    api_post("/presence", {"groupId": group, "state": state})
 
 
-def react_to(msg, emoji):
+def react_to(msg, emoji, group=CHAT_GROUP):
     """React to an incoming group message (msg = a /messages entry)."""
-    api_post("/react", {"groupId": CHAT_GROUP, "id": msg.get("id"),
+    api_post("/react", {"groupId": group, "id": msg.get("id"),
                         "participant": msg.get("participant"), "fromMe": False,
                         "emoji": emoji})
 
@@ -189,21 +227,6 @@ def _split_message(text: str, limit: int = 4000) -> list[str]:
     return chunks
 
 
-# Conservative model routing: only obvious chit-chat (greetings/acks/thanks) goes
-# to the cheap model. Anything with a "?" or a task verb stays on the default
-# (stronger) model — we only ever DOWNgrade when it's clearly safe. No extra LLM call.
-_TRIVIAL = re.compile(
-    r'^(hi+|hey+|hello|yo|ok(ay)?|kk|thx|thanks?|thank you|ty|cool|nice|great|'
-    r'done|got ?it|gotcha|haha+|lol|gm|gn|good ?(morning|night|evening|afternoon)|'
-    r'sup|np|no problem|👍|🙏|🙌|😄|😂)[!.\s]*$', re.I)
-
-def pick_model(text):
-    t = (text or "").strip()
-    if len(t) <= 40 and "?" not in t and _TRIVIAL.match(t):
-        return config.cheap_model      # trivial → Haiku
-    return None                         # everything else → default (Sonnet)
-
-
 def process(text):
     # Send a placeholder we'll EDIT in place into the final answer, and show
     # "typing…" (kept alive on a timer) while claude is thinking.
@@ -246,48 +269,260 @@ def process(text):
             reply_file(path)
 
 
+def _message_text(m, transcribe=True):
+    """Build the turn text: voice→transcript, plus any quoted-reply context."""
+    txt = (m.get("text") or "").strip()
+    if not txt and transcribe and m.get("voicePath"):
+        t = transcribe_voice(m["voicePath"])
+        if t:
+            txt = f"[Voice message]: {t}"
+    if not txt:
+        return ""
+    quoted = (m.get("quoted") or "").strip()
+    return f'(In reply to: "{quoted[:500]}")\n\n{txt}' if quoted else txt
+
+
+_MENTION_RE = re.compile(r'@\d+\s*')
+_CONFIRM_RE = re.compile(r'\b(confirm|confirmed|approve|approved)\b', re.I)
+# Owner phrasing that grants/approves a new capability for an active group.
+_GRANT_RE = re.compile(r'\b(you (can|may|are allowed|could)|allow(ed)?|approve|approved|'
+                       r'enable|grant|permit|permission|access)\b', re.I)
+
+# Tool keyword detection — maps regex → minimal tool set + scope constraints.
+_SPLITWISE_RE = re.compile(r'\bsplitwise\b', re.I)
+_JIO_RE       = re.compile(
+    r'\bjio\b.{0,60}\b(email|complaint|complain|care|send|message|fibre|fiber|customer|service)\b|'
+    r'\b(email|complaint|complain|send).{0,60}\bjio\b',
+    re.I,
+)
+
+# Minimal expense-only tool set — deliberately omits get_groups and get_friends
+# (those list ALL of Vineet's data and must never be exposed to group members).
+_SPLITWISE_EXPENSE_TOOLS = [
+    "mcp__splitwise__create_expense",
+    "mcp__splitwise__resolve_group",    # resolves a name → ID; doesn't list all groups
+    "mcp__splitwise__get_categories",
+    "mcp__splitwise__resolve_category",
+    "mcp__splitwise__get_current_user",
+    "mcp__splitwise__resolve_friend",   # resolves a name → ID; doesn't list all friends
+]
+
+# Patterns to extract a Splitwise group name from grant text.
+# Matches "only in X group", "/ X group", "X group only", "only X group".
+_SW_GROUP_RE = re.compile(
+    r'(?:only\s+(?:in|for|allow)|in|for|\/)\s+((?:\w+\s+){0,3}\w+?)\s+group\b|'
+    r'\b((?:\w+\s+){0,2}\w+?)\s+group\b\s+only\b',
+    re.I
+)
+_SW_STOPWORDS = {'this', 'that', 'the', 'a', 'an', 'my', 'our', 'public', 'private', 'whatsapp'}
+
+
+def _extract_sw_group(text):
+    for m in _SW_GROUP_RE.finditer(text):
+        g = next((x.strip() for x in m.groups() if x), None)
+        if g and g.lower() not in _SW_STOPWORDS and len(g) < 40:
+            return g
+    return None
+
+
+def _detect_tools(text, existing_tools, existing_scope=None):
+    """Return (updated_tools, updated_scope) based on keywords in a grant message."""
+    tools = list(existing_tools or [])
+    scope = dict(existing_scope or {})
+    if _SPLITWISE_RE.search(text):
+        for t in _SPLITWISE_EXPENSE_TOOLS:
+            if t not in tools:
+                tools.append(t)
+        grp = _extract_sw_group(text)
+        if grp:
+            scope["splitwise_group"] = grp
+    if _JIO_RE.search(text):
+        scope["jio_complaint"] = True   # triggers JIO marker instructions in restricted prompt
+    return tools, scope
+
+
+def _strip_mention(text):
+    return _MENTION_RE.sub("", text or "").strip()
+
+
+def _group_name(jid):
+    for g in (api_get("/groups") or []):
+        if g.get("id") == jid:
+            return g.get("subject") or jid
+    return jid
+
+
+# ── group (untrusted) turns ───────────────────────────────────────────────────
+def handle_group_turn(group, m, text, policy):
+    """Run a sandboxed, tool-restricted turn for an active external group."""
+    sender = m.get("participant")
+    sender_pn = m.get("senderPn") or sender
+    group_access.audit(group, sender, "turn", text[:120])
+    react_to(m, "👀", group)
+    # Prepend sender phone so the bot can include it in tool calls (e.g. complaint emails).
+    if sender_pn:
+        text = f"[Sender phone: {sender_pn}]\n{text}"
+    try:
+        system_prompt = group_access.restricted_prompt(policy)
+        reply = handle(
+            text, f"whatsapp:group:{group}",
+            extra_system=system_prompt,
+            allowed_tools=policy.get("allowed_tools") or [],   # [] → talk only
+            work_dir=group_access.PUBLIC_WORKDIR,
+        )
+        if reply.error:
+            reply_text(f"⚠️ {reply.error}", group)
+        elif reply.text:
+            clean = _process_jio_markers(reply.text, group)
+            if clean:
+                reply_text(to_whatsapp(clean), group)
+    except Exception as e:
+        err = f"[whatsapp] group turn error ({policy.get('name', group)}): {e}"
+        print(err)
+        reply_text("⚠️ Something went wrong on my end. Please try again.", group)
+        reply_text(f"⚠️ Group turn error in *{policy.get('name', group)}*: `{e}`")
+    finally:
+        react_to(m, "✅", group)
+
+
+def propose_activation(group, m, raw_text):
+    """Owner @tagged the bot in a group to set it up → send the plan to the PRIMARY
+    (private) group and await confirm. Nothing is posted in the target group."""
+    sender = m.get("senderPn") or m.get("participant")
+    tasks = _strip_mention(raw_text)
+    if not tasks:
+        reply_text("Tag me in the group with what I'm allowed to do there, e.g. "
+                   "\"@bot you can answer general questions\".")
+        return
+    name = _group_name(group)
+    detected_tools, detected_scope = _detect_tools(tasks, [], {})
+    group_access.set_pending(group, {"name": name, "tasks": tasks,
+                                     "allowed_tools": detected_tools, "scope": detected_scope})
+    group_access.audit(group, sender, "proposed", tasks[:120])
+    tool_note = f"\nTools: {', '.join(t.split('__')[-1] for t in detected_tools)}" if detected_tools else ""
+    scope_note = (f"\nScope: Splitwise → {detected_scope['splitwise_group']} group only"
+                  if detected_scope.get("splitwise_group") else "")
+    reply_text(
+        f"🔐 *Set up «{name}»*\n"
+        f"You're allowing me to do this there:\n{tasks}{tool_note}{scope_note}\n\n"
+        f"Reply *confirm* to activate.")
+
+
+def route(m):
+    group = m.get("from") or ""
+    sender = m.get("participant")
+    sender_pn = m.get("senderPn") or sender   # real phone even behind a LID mask
+    mentioned = bool(m.get("mentionsMe"))
+    owner = group_access.is_owner(sender_pn)
+
+    # 0) Owner confirming a pending activation — accepted from ANYWHERE (the setup
+    #    message goes to the primary group, so that's the natural place to confirm).
+    if owner:
+        raw = _strip_mention(_message_text(m, transcribe=False))
+        if raw and len(raw) < 40 and _CONFIRM_RE.search(raw):
+            jid = group if group_access.get_pending(group) else None
+            if not jid:
+                lp = group_access.latest_pending()
+                jid = lp[0] if lp else None
+            if jid:
+                prop = group_access.get_pending(jid)
+                group_access.activate(jid, prop["name"], prop["tasks"],
+                                      prop.get("allowed_tools") or [],
+                                      prop.get("scope") or {})
+                group_access.clear_pending(jid)
+                group_access.audit(jid, sender_pn, "activated", prop["tasks"][:120])
+                reply_text(f"✅ «{prop['name']}» is active.\nThere I'll only: {prop['tasks']}\n"
+                           f"Members must @mention me each time.")
+                return
+
+    # 1) Vineet's private chat group — full trusted agent (unchanged behaviour).
+    if group == CHAT_GROUP:
+        text = _message_text(m)
+        if text:
+            print(f"[whatsapp] << {text[:80]}")
+            react_to(m, "👀")
+            process(text)
+            react_to(m, "✅")
+        return
+
+    # Everything below is a shared/external group.
+    if not group.endswith("@g.us"):
+        return  # ignore 1:1 DMs for now (groups only)
+
+    policy = group_access.group_policy(group)
+
+    # 2) Active group: act only when @mentioned.
+    if policy:
+        if not mentioned:
+            return
+        # Owner can expand what the bot may do here FROM THE GROUP itself — but
+        # TALK-ONLY: this path only appends to the task description, it never grants
+        # tools. Granting an actual tool/capability is a deliberate step done from the
+        # private chat (group_mgmt.py add, or the propose→confirm flow), so a single
+        # in-group line can't widen the bot's real powers (defends spoofed senderPn /
+        # social engineering). Matches the security model in group_access.example.yaml.
+        if owner:
+            raw = _strip_mention(_message_text(m, transcribe=False))
+            if raw and _GRANT_RE.search(raw):
+                new_tasks = (policy.get("tasks", "").rstrip() + "\n- " + raw).strip()
+                group_access.activate(group, policy.get("name"), new_tasks,
+                                      policy.get("allowed_tools") or [], policy.get("scope") or {})
+                group_access.audit(group, sender_pn, "approved-talk", raw[:120])
+                note = ""
+                if _SPLITWISE_RE.search(raw) or _JIO_RE.search(raw):
+                    note = ("\n(Note: this only updated what I'll *discuss* here. To grant the "
+                            "actual tool, do it from our private chat — `group_mgmt.py add`.)")
+                reply_text(f"✅ Noted. I can now also do this here:\n{raw}{note}", group)
+                return
+        text = _message_text(m)
+        if text:
+            print(f"[whatsapp] << [{group[:18]}] {text[:60]}")
+            handle_group_turn(group, m, text, policy)
+        return
+
+    # 3) Inactive group: only the OWNER can set it up, by @mentioning with instructions.
+    if owner and mentioned:
+        propose_activation(group, m, _message_text(m, transcribe=False))
+    # else: default-deny, stay silent.
+
+
+_running = True
+
+
+def _shutdown(signum, frame):
+    # Exit the poll loop promptly on SIGTERM so `systemctl restart` doesn't wait
+    # out TimeoutStopSec (an in-flight claude subprocess is left for systemd to kill).
+    global _running
+    _running = False
+
+
 def main():
+    signal.signal(signal.SIGTERM, _shutdown)
     last_ts = load_offset()
-    print(f"[whatsapp] started, chat group={CHAT_GROUP}, conv={CONV_KEY}")
-    while True:
+    print(f"[whatsapp] started, chat group={CHAT_GROUP}, "
+          f"external groups allowed={list(group_access.all_groups().keys())}")
+    while _running:
         try:
             status = api_get("/status")
             if not status or not status.get("connected"):
                 time.sleep(10)
                 continue
 
-            msgs = api_get(f"/messages?limit=50&from={CHAT_GROUP}") or []
-            # new human messages in the group (not the bot's own sends)
+            msgs = api_get("/messages?limit=80") or []
             new = [m for m in msgs
-                   if not m.get("fromMe")
-                   and m.get("from") == CHAT_GROUP
-                   and m.get("timestamp", 0) > last_ts]
+                   if not m.get("fromMe") and m.get("timestamp", 0) > last_ts]
 
             for m in sorted(new, key=lambda x: x.get("timestamp", 0)):
-                txt = (m.get("text") or "").strip()
-                voice_path = m.get("voicePath")
-
-                # transcribe voice if no text but voice file present
-                if not txt and voice_path:
-                    transcript = transcribe_voice(voice_path)
-                    if transcript:
-                        txt = f"[Voice message]: {transcript}"
-
-                if txt:
-                    quoted = (m.get("quoted") or "").strip()
-                    if quoted:
-                        full = f'(In reply to: "{quoted[:500]}")\n\n{txt}'
-                    else:
-                        full = txt
-                    print(f"[whatsapp] << {txt[:80]}" + (" [reply]" if quoted else ""))
-                    react_to(m, "👀")     # acknowledge receipt
-                    process(full)
-                    react_to(m, "✅")     # done
+                try:
+                    route(m)
+                except Exception as e:
+                    print(f"[whatsapp] route error: {e}")
                 last_ts = max(last_ts, m.get("timestamp", 0))
                 save_offset(last_ts)
         except Exception as e:
             print(f"[whatsapp] error: {e}")
         time.sleep(POLL_INTERVAL)
+    print("[whatsapp] stopped (SIGTERM)")
 
 
 if __name__ == "__main__":

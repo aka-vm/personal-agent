@@ -55,7 +55,9 @@ Each lives under `~/.config/`, never in the repo. See each `services/*/info.md`:
 cp systemd/agent-telegram.service ~/.config/systemd/user/
 systemctl --user daemon-reload
 systemctl --user enable --now agent-telegram.service
-# (agent-whatsapp.service exists but is for a future inbound feature — leave off)
+# WhatsApp adapter (now the primary channel — see services/whatsapp/info.md):
+cp systemd/agent-whatsapp.service ~/.config/systemd/user/
+systemctl --user enable --now agent-whatsapp.service
 ```
 Message your bot on Telegram. Logs: `~/agent/logs/telegram.log`.
 

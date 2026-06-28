@@ -9,6 +9,12 @@ WorkingDirectory=/home/vineet/agent
 ExecStart=/usr/bin/python3 -u /home/vineet/agent/adapters/whatsapp_bot.py
 Restart=always
 RestartSec=10
+# Restart used to hang ~90s then SIGKILL (exit 144): the default control-group
+# KillMode SIGTERMs the in-flight `claude` subprocess + MCP servers too, and they
+# die slowly. KillMode=mixed SIGTERMs only the main bot (it exits promptly via the
+# signal handler in whatsapp_bot.py) and SIGKILLs the rest.
+KillMode=mixed
+TimeoutStopSec=15
 StandardOutput=append:/home/vineet/agent/logs/whatsapp.log
 StandardError=append:/home/vineet/agent/logs/whatsapp.log
 

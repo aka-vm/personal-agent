@@ -2,6 +2,12 @@
 
 *Generated from a live scan of the agent + current web best-practices. Recommend-only.*
 
+> **STATUS (as of 2026-06-29 review): largely implemented.** Session capping
+> (`session_timeout` / `session_max_age` in `claude_runner.py`), model routing
+> (`pick_model` in `core/agent.py`), the cheap-model downgrade for chit-chat, and
+> trimmed always-on context are all live. Treat the recommendations below as
+> historical context, not open work.
+
 ## How tokens are actually spent here
 The agent runs `claude -p --resume <session>` per turn (model **claude-sonnet-4-6**), from `/home/vineet/agent`. **Every turn re-sends:**
 - Claude Code's base system prompt (fixed)

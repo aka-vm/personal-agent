@@ -1,0 +1,52 @@
+# Group access policy — who else may use the bot, in which groups, for what.
+# Copy to ~/.config/agent/group_access.yaml. The LIVE file is gitignored.
+#
+# ── SECURITY MODEL (enforced in code, not just here) ─────────────────────────
+#  • DEFAULT DENY    — any group not listed below is ignored entirely.
+#  • MENTION GATED   — in these groups the bot acts ONLY when @mentioned, on every
+#                      message — replies and follow-ups included (no sticky chat).
+#  • SANDBOXED       — group turns run from a minimal PUBLIC workspace with NO
+#                      access to Vineet's CLAUDE.md / long-term memory / personal
+#                      info. There is nothing private in context to leak.
+#  • TOOL ALLOWLIST  — only the tools in `allowed_tools` work (default: none → the
+#                      bot can talk but take NO actions). Non-bypass permission
+#                      mode: anything not allowed is hard-denied.
+#  • SEPARATE SESSION per group — no cross-leak with Vineet's private chat.
+#  • NEVER from Vineet's accounts / NEVER his personal info — the bot must not send
+#    or post from his accounts, act toward third parties, or reveal his personal
+#    info. Only possible if explicitly granted in `allow_personal` (standing OK).
+#  • Every group interaction is logged to logs/group_access.log.
+#  • UNAPPROVED REQUEST — if a group member asks for something not permitted here,
+#    the bot does NOT do it: it replies that the action needs Vineet's approval,
+#    and notifies/logs it for him.
+#  • APPROVAL FLOW — Vineet DEFINES tasks privately (personal chat). Granting any new
+#    action needs Vineet's EXPLICIT confirmation, and the bot states the RISK first.
+#    Only a message from Vineet's own number counts as an approval — never a group
+#    member's (defends against spoofing / prompt-injection).
+#
+# allowed_tools lists ONLY MCP tool names (e.g. the Splitwise expense tools
+# "mcp__splitwise__create_expense", …). Group sessions run sandboxed in NON-bypass
+# permission mode, where the `claude` CLI's --allowedTools flag SILENTLY IGNORES
+# Bash(...) patterns — Bash is hard-denied. So a script-based capability CANNOT be
+# granted via allowed_tools; it must use the marker approach instead (Claude emits a
+# MARKER:<data> line, the adapter processes it and runs the script). See jio-email.
+# Do NOT list sensitive MCP tools (gmail/wa send, contacts, gcal write…) here.
+#
+# Per-service scope keywords auto-detected from grant text:
+#   "splitwise"       → adds Splitwise expense MCP tools; optional "only X group" scoping
+#   "jio complaint"   → enables marker-based jio complaints (NO tool granted; the
+#                       adapter runs jio_complaint.py → jiofibercare@jio.com only)
+
+groups: {}      # empty → no external group is allowed (current behaviour)
+
+# Example (commented — uncomment + fill a real group JID to enable):
+#
+# groups:
+#   "120363XXXXXXXXXXXX@g.us":
+#     name: "Family"
+#     tasks: |
+#       The ONLY things you may do in this group, stated plainly. Refuse anything
+#       else politely. e.g. "Add shared expenses to Splitwise when members ask."
+#     allowed_tools:                       # MCP tools only — Bash(...) is ignored here
+#       - "mcp__splitwise__create_expense"
+#     allow_personal: []   # standing approvals for personal actions; default none

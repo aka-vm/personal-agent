@@ -10,7 +10,7 @@ import threading
 import requests
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from core.agent import handle
+from core.agent import handle, pick_model
 from core.config import config
 from core import telegram_net
 
@@ -72,7 +72,7 @@ def process(chat_id, text):
     stop = threading.Event()
     threading.Thread(target=keep_typing, args=(chat_id, stop), daemon=True).start()
     try:
-        reply = handle(text, CONV_KEY, extra_system=EXTRA_SYSTEM)
+        reply = handle(text, CONV_KEY, extra_system=EXTRA_SYSTEM, model=pick_model(text))
     finally:
         stop.set()
 

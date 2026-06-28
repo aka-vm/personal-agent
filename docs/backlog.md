@@ -6,15 +6,10 @@
 
 ### P0 — Broken, fix first
 - (none — all clear)
-- ✅ DONE: Gmail read by ID — listings now print full message IDs and `cmd_read`
-  uses them directly (robust short-prefix fallback kept). (`tools/gmail.py`)
-- ✅ DONE: Google Contacts scope — fixed by sharing one OAuth scope superset
-  across all Google tools (`tools/google_scopes.py`); search works.
 
 ### P1 — High value
-- **TODO: Share a link in chat → save to Karakeep** — when Vineet sends a URL in
-  the RPI bot group, detect it and create a Karakeep bookmark/article via its API
-  (Karakeep then auto-fetches + AI-tags). Make capturing/reading-later effortless.
+- ✅ DONE: Share a link in chat → save to Karakeep — handled per CLAUDE.md (URL
+  with no other instruction → `karakeep.py add` with tags). Behaviour is live.
 - ✅ DONE: WhatsApp voice input (STT) — bridge downloads voice messages, adapter
   transcribes via Groq Whisper (whisper-large-v3). Groq key saved in secrets.env.
 - **TODO: WhatsApp image input (vision)** — photos sent in the group are ignored.
@@ -30,9 +25,11 @@
 
 ### P2 — Nice to have
 - **TODO: WhatsApp call via bot** — Baileys has `sock.call([jid], 'audio')`. Add `/call` endpoint to `docker/whatsapp-bridge/server.js` + `wa.py call <name>` command.
-- **TODO: WhatsApp message chunking** — splits at exactly 4000 chars, can cut mid-word. Fix: split at paragraph/sentence boundaries. (`adapters/whatsapp_bot.py:200`)
+- ✅ DONE: WhatsApp message chunking now splits at paragraph/line boundaries (`_split_message`).
 - **TODO: Daily briefing session** — reuses persistent session key `task:daily-briefing` each day → context grows, LLM cost creeps up. Use a fresh session per run. (`tasks/daily_briefing.py`)
 - **TODO: Log rotation** — `alerts.py` logs "All OK" every 15 min forever. Add logrotate or only log on state change.
+- **TODO (from 2026-06-29 review): Telegram parity** — Telegram adapter lacks the WhatsApp niceties: smart chunking via `_split_message` (still hard-cuts at 4000), ⏳ placeholder + edit, 👀/✅ reactions, edited-message handling. Consider extracting a shared adapter base since the two have diverged. (model routing now shared via `core.agent.pick_model`.)
+- **TODO (from 2026-06-29 review): marker-based weather capability** — the old `weather` group cap was removed (it used a `Bash(...)` allowedTool that's hard-denied in sandboxed sessions, so it silently did nothing). To re-add, build it marker-style like jio-email (adapter runs `weather.py`).
 
 - **TODO: More reliable weather** — Open-Meteo (the API) is fine; the flaky parts are
   the dependency chain: GPS comes from Home Assistant (`person.vineet`) which can be
