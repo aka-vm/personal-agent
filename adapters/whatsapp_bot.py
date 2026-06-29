@@ -25,6 +25,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from core.agent import handle, pick_model
 from core.config import config
 from core import group_access
+from tools import wa_history
 
 
 WORK_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -348,7 +349,12 @@ def _strip_mention(text):
 def _group_name(jid):
     for g in (api_get("/groups") or []):
         if g.get("id") == jid:
-            return g.get("subject") or jid
+            name = g.get("subject") or jid
+            try:
+                wa_history.update_group_name(jid, name)
+            except Exception:
+                pass
+            return name
     return jid
 
 
@@ -414,6 +420,12 @@ def route(m):
     sender_pn = m.get("senderPn") or sender   # real phone even behind a LID mask
     mentioned = bool(m.get("mentionsMe"))
     owner = group_access.is_owner(sender_pn)
+
+    # Log every incoming message before any routing decisions.
+    try:
+        wa_history.log(m)
+    except Exception:
+        pass
 
     # 0) Owner confirming a pending activation — accepted from ANYWHERE (the setup
     #    message goes to the primary group, so that's the natural place to confirm).
@@ -499,6 +511,7 @@ def _shutdown(signum, frame):
 def main():
     signal.signal(signal.SIGTERM, _shutdown)
     last_ts = load_offset()
+    wa_history.init_db()
     print(f"[whatsapp] started, chat group={CHAT_GROUP}, "
           f"external groups allowed={list(group_access.all_groups().keys())}")
     while _running:

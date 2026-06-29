@@ -119,6 +119,18 @@ when you need details rather than asking Vineet for what's already documented.
   `ESCAPE_CALL_ENV=~/.config/agent/secrets.env python3 /home/vineet/escape-call/server.py call --delay 0 [--scenario boss|mom|reminder]`
   Default rings his primary number; `--to +91…` for the other. He wants it — no confirm needed.
 
+## WhatsApp chat history
+All incoming WhatsApp messages (private chat + every group) are logged automatically to `/mnt/ssd/rpi_storage/wa_history.db`.
+
+When Vineet asks to summarise a group or messages, use:
+- `python3 tools/wa_history.py groups` — list all groups/chats with message counts
+- `python3 tools/wa_history.py dump "<group name>" <hours>` — plain-text dump for the last N hours (feed to LLM for summary)
+- `python3 tools/wa_history.py tail "<group name>" [N]` — last N messages
+- `python3 tools/wa_history.py since "<group name>" <hours>` — messages since N hours ago
+- `python3 tools/wa_history.py search "<query>" [group]` — keyword search
+
+Group names can be partial matches (e.g. "Flat c112"). Voice messages log as `[voice message]` — transcription only happens when the bot responds.
+
 ## External WhatsApp group management
 Manage which external groups can use the bot and what they can do:
 - **List/inspect:** `python3 tools/group_mgmt.py list` · `python3 tools/group_mgmt.py show <jid>`
