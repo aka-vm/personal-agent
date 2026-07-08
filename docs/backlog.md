@@ -7,6 +7,11 @@
 ### P0 — Broken, fix first
 - (none — all clear)
 
+### Fixed in 2026-07-08 review
+- ✅ Double-logging in monthly_flat_expenses.py: log() wrote to file AND printed to stdout; cron redirect caused every entry to appear twice. Fixed by removing print().
+- ✅ Stale annual cron `0 9 2 7 *` sending "Fix Google OAuth" every July 2. Removed.
+- ✅ Committed 4 untracked task files (monthly_flat_expenses, payment_reminders, flat_expenses.json, expense_tracker_plan.md) + group_access/gcal improvements.
+
 ### P1 — High value
 - ✅ DONE: Share a link in chat → save to Karakeep — handled per CLAUDE.md (URL
   with no other instruction → `karakeep.py add` with tags). Behaviour is live.
