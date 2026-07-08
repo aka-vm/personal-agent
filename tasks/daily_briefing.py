@@ -2,7 +2,7 @@
 """
 Daily briefing — 8am. Agent-powered so it follows Vineet's preferences (email
 summary format, IST, WhatsApp formatting) from CLAUDE.md + memory. Delivered to
-the RPI bot WhatsApp group (the active channel; Telegram is blocked).
+the RPI bot WhatsApp group (primary channel; Telegram also active).
 
 Falls back to a terse deterministic note if the agent call fails, so a morning
 is never silent.

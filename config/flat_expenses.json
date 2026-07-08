@@ -1,0 +1,18 @@
+{
+  "group_id": 91684648,
+  "members": {
+    "vineet":    64836932,
+    "nived":     50382709,
+    "ansh":      53697061,
+    "madhurima": 72844773
+  },
+  "payer": "vineet",
+  "items": [
+    {"name": "Internet", "amount": 1178, "split": "equal"},
+    {"name": "Maid",     "amount": 5000, "split": "equal"},
+    {
+      "name": "Cook", "amount": 6500, "split": "custom",
+      "shares": {"vineet": 2000, "nived": 1500, "ansh": 1500, "madhurima": 1500}
+    }
+  ]
+}

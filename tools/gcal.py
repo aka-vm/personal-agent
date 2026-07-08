@@ -8,12 +8,15 @@ Usage:
   gcal.py add <account> <title> <date> [time] [duration_mins] [description]
   gcal.py search <account> <query>
   gcal.py calendars [personal|work|both]
+  gcal.py freebusy <name_or_email> [YYYY-MM-DD]
 """
 import sys, os, json
 from datetime import datetime, timedelta, timezone
 from googleapiclient.discovery import build
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
+
+IST = timezone(timedelta(hours=5, minutes=30))
 
 CONFIG_DIR = os.path.expanduser("~/.config/google")
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -191,6 +194,153 @@ def cmd_calendars(accounts):
         for cal in result.get("items", []):
             print(f"  {cal['summary']} ({cal['id']})")
 
+def _resolve_work_email(name_or_email):
+    """Resolve a name → email. Returns (email, display_name).
+    Strategy: directory API → Gmail sent search → domain guess."""
+    if '@' in name_or_email:
+        display = name_or_email.split('@')[0].replace('.', ' ').title()
+        return name_or_email, display
+
+    # 1. Try Workspace directory API (requires directory.readonly scope; may 403)
+    try:
+        token_file = os.path.join(CONFIG_DIR, "work_token.json")
+        creds = Credentials.from_authorized_user_file(token_file, SCOPES)
+        if creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+        people_svc = build('people', 'v1', credentials=creds)
+        res = people_svc.people().searchDirectoryPeople(
+            query=name_or_email,
+            readMask='emailAddresses,names',
+            sources=['DIRECTORY_SOURCE_TYPE_DOMAIN_CONTACT'],
+            pageSize=5,
+        ).execute()
+        people = res.get('people', [])
+        if people:
+            p = people[0]
+            email = p.get('emailAddresses', [{}])[0].get('value', '')
+            display = p.get('names', [{}])[0].get('displayName', name_or_email)
+            if email:
+                return email, display
+    except Exception:
+        pass
+
+    # 2. Search Gmail for messages from/to this person to extract their email
+    try:
+        from googleapiclient.discovery import build as _build
+        token_file = os.path.join(CONFIG_DIR, "work_token.json")
+        creds = Credentials.from_authorized_user_file(token_file, SCOPES)
+        gmail_svc = _build('gmail', 'v1', credentials=creds)
+        results = gmail_svc.users().messages().list(
+            userId='me',
+            q=f'from:{name_or_email}',
+            maxResults=3,
+        ).execute()
+        msgs = results.get('messages', [])
+        if msgs:
+            msg = gmail_svc.users().messages().get(
+                userId='me', id=msgs[0]['id'], format='metadata',
+                metadataHeaders=['From'],
+            ).execute()
+            headers = {h['name']: h['value'] for h in msg.get('payload', {}).get('headers', [])}
+            from_hdr = headers.get('From', '')
+            # Parse "Display Name <email@domain.com>"
+            import re
+            m = re.search(r'<([^>]+)>', from_hdr)
+            if m:
+                email = m.group(1)
+                display = from_hdr.split('<')[0].strip().strip('"') or name_or_email.title()
+                return email, display
+    except Exception:
+        pass
+
+    # 3. Fallback: guess aftershoot.com domain
+    guess = f"{name_or_email.lower().replace(' ', '.')}@aftershoot.com"
+    return guess, name_or_email.title()
+
+def cmd_freebusy(name_or_email, date_str=None):
+    """Check a co-worker's schedule. Tries event details first, falls back to free/busy blocks."""
+    svc = get_service('work')
+    email, display = _resolve_work_email(name_or_email)
+
+    if date_str:
+        target = datetime.strptime(date_str, '%Y-%m-%d').replace(tzinfo=IST)
+    else:
+        now = datetime.now(IST)
+        target = now.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    day_start = target.replace(hour=0, minute=0, second=0, microsecond=0)
+    day_end   = day_start + timedelta(days=1)
+    date_label = day_start.strftime('%A %d %b %Y')
+
+    print(f"\n── {display} ({email}) — {date_label} ──")
+
+    # Try full event listing first (works if calendar is shared or Workspace allows visibility)
+    try:
+        result = svc.events().list(
+            calendarId=email,
+            timeMin=day_start.isoformat(),
+            timeMax=day_end.isoformat(),
+            singleEvents=True,
+            orderBy='startTime',
+        ).execute()
+        events = result.get('items', [])
+        if not events:
+            print("  Nothing scheduled.")
+        else:
+            print("  (calendar shared — showing full details)")
+            for e in events:
+                print(f"  {format_event(e)}")
+        return
+    except Exception:
+        pass
+
+    # Fall back to free/busy query
+    fb = svc.freebusy().query(body={
+        'timeMin': day_start.isoformat(),
+        'timeMax': day_end.isoformat(),
+        'timeZone': 'Asia/Kolkata',
+        'items': [{'id': email}],
+    }).execute()
+    busy = fb.get('calendars', {}).get(email, {}).get('busy', [])
+    errors = fb.get('calendars', {}).get(email, {}).get('errors', [])
+
+    if errors:
+        print(f"  ⚠️  Can't read calendar: {errors[0].get('reason', 'unknown error')}")
+        print(f"  (Try sharing their calendar with you, or ask them directly.)")
+        return
+
+    if not busy:
+        print("  All free — no busy blocks found.")
+        return
+
+    print(f"  Busy ({len(busy)} block{'s' if len(busy) != 1 else ''}):")
+    for slot in busy:
+        s = datetime.fromisoformat(slot['start'].replace('Z', '+00:00')).astimezone(IST)
+        e = datetime.fromisoformat(slot['end'].replace('Z', '+00:00')).astimezone(IST)
+        print(f"  🔴 {s.strftime('%I:%M %p')} – {e.strftime('%I:%M %p')} IST")
+
+    # Compute free windows between 9 AM and 7 PM
+    work_start = day_start.replace(hour=9, minute=0)
+    work_end   = day_start.replace(hour=19, minute=0)
+    free = []
+    cursor = work_start
+    for slot in busy:
+        s = datetime.fromisoformat(slot['start'].replace('Z', '+00:00')).astimezone(IST)
+        e = datetime.fromisoformat(slot['end'].replace('Z', '+00:00')).astimezone(IST)
+        s = max(s, work_start)
+        if s > cursor:
+            free.append((cursor, s))
+        cursor = max(cursor, e)
+    if cursor < work_end:
+        free.append((cursor, work_end))
+
+    if free:
+        print(f"\n  Free windows (9 AM–7 PM):")
+        for fs, fe in free:
+            dur = int((fe - fs).total_seconds() / 60)
+            if dur >= 15:
+                print(f"  🟢 {fs.strftime('%I:%M %p')} – {fe.strftime('%I:%M %p')} ({dur} min)")
+
 def resolve_accounts(arg):
     if arg == "both":
         return ["personal", "work"]
@@ -205,6 +355,7 @@ USAGE = """Usage:
   gcal.py add <personal|work> <title> <YYYY-MM-DD> [end_date|HH:MM] [duration_mins] [description]
   gcal.py search <personal|work> <query>
   gcal.py calendars [personal|work|both]
+  gcal.py freebusy <name_or_email> [YYYY-MM-DD]
 """
 
 if __name__ == "__main__":
@@ -260,6 +411,14 @@ if __name__ == "__main__":
     elif cmd == "calendars":
         accounts = resolve_accounts(args[1] if len(args) > 1 else "both")
         cmd_calendars(accounts)
+
+    elif cmd == "freebusy":
+        if len(args) < 2:
+            print("Usage: gcal.py freebusy <name_or_email> [YYYY-MM-DD]")
+            sys.exit(1)
+        name_or_email = args[1]
+        date_str = args[2] if len(args) > 2 else None
+        cmd_freebusy(name_or_email, date_str)
 
     else:
         print(f"Unknown command: {cmd}\n{USAGE}")
