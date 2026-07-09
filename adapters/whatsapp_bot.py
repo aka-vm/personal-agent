@@ -30,6 +30,7 @@ from tools import wa_history
 
 WORK_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 JIO_COMPLAINT = os.path.join(WORK_DIR, "tools", "jio_complaint.py")
+CLAUDE_BIN = os.path.expanduser("~/.local/bin/claude")
 _JIO_MARKER_RE = re.compile(r'^(JIO_DRAFT|JIO_SEND):(.+)$', re.MULTILINE)
 
 
@@ -210,6 +211,33 @@ def transcribe_voice(container_path: str) -> str | None:
         return None
 
 
+def _image_host_path(container_path: str) -> str:
+    return container_path.replace(CONTAINER_DATA, HOST_DATA, 1)
+
+
+def _describe_image(host_path: str) -> str | None:
+    """One-shot trusted Claude call to describe an image — used for sandboxed group turns
+    where the group session can't read files directly."""
+    if not os.path.isfile(host_path):
+        return None
+    prompt = (
+        f"Read this image file and describe what you see in full detail. "
+        f"Include all visible text, numbers, prices, item names, dates, and any other "
+        f"specific data. Image path: {host_path}"
+    )
+    cmd = [CLAUDE_BIN, "-p", prompt,
+           "--permission-mode", "bypassPermissions",
+           "--output-format", "json",
+           "--allowedTools", "Read"]
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True, cwd=WORK_DIR, timeout=90)
+        data = json.loads(proc.stdout)
+        return (data.get("result") or "").strip() or None
+    except Exception as e:
+        print(f"[whatsapp] image description error: {e}")
+        return None
+
+
 def _split_message(text: str, limit: int = 4000) -> list[str]:
     """Split at paragraph boundaries to avoid cutting mid-word."""
     if len(text) <= limit:
@@ -365,6 +393,14 @@ def handle_group_turn(group, m, text, policy):
     sender_pn = m.get("senderPn") or sender
     group_access.audit(group, sender, "turn", text[:120])
     react_to(m, "👀", group)
+    # Image: pre-describe with a trusted session; inject as context so the sandboxed
+    # group session gets the image contents without needing file-read access.
+    img = m.get("imagePath")
+    if img and text:  # only when asked (caption = the question)
+        host_path = _image_host_path(img)
+        desc = _describe_image(host_path)
+        if desc:
+            text = f"<external>[Image sent by user:\n{desc}]</external>\n{text}"
     # Prepend sender phone so the bot can include it in tool calls (e.g. complaint emails).
     if sender_pn:
         text = f"[Sender phone: {sender_pn}]\n{text}"
@@ -450,6 +486,11 @@ def route(m):
     # 1) Vineet's private chat group — full trusted agent (unchanged behaviour).
     if group == CHAT_GROUP:
         text = _message_text(m)
+        img = m.get("imagePath")
+        if img and text:  # only analyze when asked (caption = the question)
+            host_path = _image_host_path(img)
+            if os.path.isfile(host_path):
+                text = f"[Image attached — use the Read tool to view it: {host_path}]\n{text}"
         if text:
             print(f"[whatsapp] << {text[:80]}")
             react_to(m, "👀")
