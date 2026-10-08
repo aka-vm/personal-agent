@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Room Lights</title>
+<style>
+:root {
+  --bg: #0b0b14;
+  --surface: rgba(255,255,255,0.04);
+  --border: rgba(255,255,255,0.08);
+  --text: #e2e2ec;
+  --muted: #6b6b80;
+  --on-amber: #ffce45;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+  min-height: 100vh;
+  padding-bottom: 32px;
+}
+
+/* ── Header ── */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 20px 12px;
+}
+.header h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.4px; }
+.live-dot {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12px; color: var(--muted);
+}
+.live-dot span {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: #3a3a50;
+  transition: background 0.4s, box-shadow 0.4s;
+}
+.live-dot span.ok { background: #4dde8f; box-shadow: 0 0 8px rgba(77,222,143,0.6); }
+.live-dot span.err { background: #ff4d60; }
+
+/* ── Master Controls ── */
+.master {
+  margin: 0 16px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.master-btns { display: flex; gap: 10px; }
+.master-btn {
+  flex: 1;
+  padding: 11px 0;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.1);
+  font-size: 15px; font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  color: var(--text);
+}
+.master-btn:active { transform: scale(0.96); }
+.master-btn.all-on  { background: rgba(255,210,60,0.14); border-color: rgba(255,210,60,0.28); }
+.master-btn.all-off { background: rgba(255,255,255,0.05); }
+
+.master-bri { display: flex; flex-direction: column; gap: 6px; }
+.ctrl-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; }
+
+/* ── Mode Toggle ── */
+.mode-toggle {
+  display: flex;
+  background: rgba(255,255,255,0.06);
+  border-radius: 10px;
+  padding: 3px;
+  gap: 3px;
+}
+.mode-btn {
+  flex: 1;
+  padding: 7px 0;
+  border-radius: 7px;
+  border: none;
+  font-size: 12px; font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: transparent;
+  color: var(--muted);
+}
+.mode-btn:active { transform: scale(0.95); }
+.mode-btn.active {
+  background: rgba(255,255,255,0.13);
+  color: var(--text);
+}
+.mode-btn.active.white { background: rgba(255,230,160,0.18); color: #ffd87a; }
+.mode-btn.active.colour { background: rgba(120,80,255,0.22); color: #c4a0ff; }
+
+/* ── Grid ── */
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  padding: 0 16px;
+}
+@media (max-width: 380px) { .grid { grid-template-columns: 1fr; } }
+
+/* ── Card ── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: border-color 0.5s ease, box-shadow 0.5s ease;
+}
+.card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.light-name { font-size: 13px; font-weight: 600; }
+.dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--muted);
+  transition: background 0.3s, box-shadow 0.3s;
+}
+.dot.on { background: #4dde8f; box-shadow: 0 0 7px rgba(77,222,143,0.7); }
+
+/* Power button */
+.power-wrap { display: flex; justify-content: center; }
+.power {
+  width: 64px; height: 64px; border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.04);
+  color: var(--muted);
+  font-size: 24px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.25s ease;
+  position: relative;
+}
+.power::before {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+.power.on {
+  border-color: rgba(255,210,60,0.55);
+  color: var(--on-amber);
+  background: rgba(255,200,50,0.1);
+  box-shadow: 0 0 22px rgba(255,200,50,0.35), inset 0 0 18px rgba(255,200,50,0.08);
+}
+.power.on::before {
+  background: radial-gradient(circle, rgba(255,200,50,0.12) 0%, transparent 70%);
+  opacity: 1;
+}
+.power:active { transform: scale(0.91); }
+
+/* Sliders */
+.ctrl { display: flex; flex-direction: column; gap: 5px; }
+
+input[type=range] {
+  -webkit-appearance: none; appearance: none;
+  width: 100%; height: 5px; border-radius: 3px;
+  background: rgba(255,255,255,0.1);
+  outline: none; cursor: pointer;
+}
+input[type=range]:disabled { opacity: 0.3; cursor: default; }
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 8px rgba(0,0,0,0.5);
+  transition: transform 0.1s;
+}
+input[type=range]:not(:disabled):active::-webkit-slider-thumb { transform: scale(1.25); }
+.bri-track  { background: linear-gradient(to right, #1a1a2a, #ffffff) !important; }
+.temp-track { background: linear-gradient(to right, #ff8c30, #fff4dc, #b8d9ff) !important; }
+.hue-track  { background: linear-gradient(to right, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000) !important; }
+.mixed-hint {
+  font-size: 10px; color: rgba(255,255,255,0.22);
+  margin-left: 5px; font-weight: 400;
+  opacity: 0; transition: opacity 0.4s;
+  letter-spacing: 0.2px;
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Room Lights</h1>
+  <div class="live-dot"><span id="live"></span><span id="live-txt">…</span></div>
+</div>
+
+<div class="master">
+  <div class="master-btns">
+    <button class="master-btn all-on" onclick="allLights(true)">All On</button>
+    <button class="master-btn all-off" onclick="allLights(false)">All Off</button>
+  </div>
+  <div class="master-bri">
+    <span class="ctrl-label">All Brightness<span class="mixed-hint" id="mixed-bri">mixed</span></span>
+    <input type="range" class="bri-track" id="master-bri" min="1" max="255" value="180"
+           oninput="masterBri(this.value)" disabled>
+  </div>
+  <div id="master-white-ctrl" class="master-bri">
+    <span class="ctrl-label">All Temperature<span class="mixed-hint" id="mixed-temp">mixed</span></span>
+    <input type="range" class="temp-track" id="master-temp" min="2000" max="6500" value="4250"
+           oninput="masterTemp(this.value)" disabled>
+  </div>
+  <div id="master-colour-ctrl" class="master-bri">
+    <span class="ctrl-label">All Hue<span class="mixed-hint" id="mixed-hue">mixed</span></span>
+    <input type="range" class="hue-track" id="master-hue" min="0" max="360" value="30"
+           oninput="masterHue(this.value)" disabled>
+  </div>
+</div>
+
+<div class="grid" id="grid"></div>
+
+<script>
+const LIGHTS = [
+  {id:'light.room_light', name:'Room Light'},
+  {id:'light.hall_bulb', name:'Wavy Lamp'},
+  {id:'light.hall_light_strip_socket_1', name:'Hall Strip'},
+  {id:'light.a1_03900d641308170_chamber_light', name:'Chamber Light'},
+  {id:'light.wiz_rgbw_tunable_64d1fc', name:'Wiz Bulb'},
+];
+
+let state = {};
+let timers = {};
+let initialized = false;
+
+// ── Color helpers ──────────────────────────────────────────────────
+function kelvinToHs(k) {
+  if(k <= 2500) return [25, 85];
+  if(k <= 3000) return [30, 65];
+  if(k <= 3500) return [38, 40];
+  if(k <= 4200) return [50, 15];
+  if(k <= 5000) return [200, 10];
+  return [220, 20];
+}
+
+function hsvToHex(h,s,v) {
+  s/=100;
+  let f=n=>{let k=(n+h/60)%6; return v*(1-s*Math.max(Math.min(k,4-k,1),0));};
+  return '#'+[f(5),f(3),f(1)].map(x=>Math.round(x*255).toString(16).padStart(2,'0')).join('');
+}
+
+function rgbHex(rgb) {
+  return rgb ? '#'+rgb.map(x=>Math.round(x).toString(16).padStart(2,'0')).join('') : '#ffce45';
+}
+
+function lightHex(s) {
+  if(s.hs_color) return hsvToHex(s.hs_color[0], s.hs_color[1], 1);
+  if(s.rgb_color) return rgbHex(s.rgb_color);
+  return '#ffce45';
+}
+
+function currentHue(id) {
+  const s = state[id];
+  if(s && s.hs_color) return Math.round(s.hs_color[0]);
+  return 30;
+}
+
+// ── Mode helpers ───────────────────────────────────────────────────
+function initMode(id) {
+  const s = state[id];
+  if(!s) return 'white';
+  const modes = s.supported_color_modes || [];
+  const hasColor = modes.includes('hs') || modes.includes('xy') || modes.includes('rgb');
+  const hasTemp  = modes.includes('color_temp');
+  if(!hasColor) return 'white';
+  if(!hasTemp)  return 'colour';
+  if(s.hs_color && s.hs_color[1] > 20) return 'colour';
+  return 'white';
+}
+
+// ── API ────────────────────────────────────────────────────────────
+async function fetchState() {
+  try {
+    const r = await fetch('/api/lights');
+    if(!r.ok) throw 0;
+    const lights = await r.json();
+    lights.forEach(l => { state[l.entity_id] = l; });
+    if(!initialized) {
+      renderGrid();
+      syncMasterSliders();
+      initialized = true;
+    } else {
+      LIGHTS.forEach(l => syncCard(l.id));
+      syncMasterSliders();
+    }
+    setLive(true);
+  } catch(e) { setLive(false); }
+}
+
+function setLive(ok) {
+  document.getElementById('live').className = ok?'ok':'err';
+  document.getElementById('live-txt').textContent = ok?'Live':'Offline';
+}
+
+async function api(entity_id, params) {
+  try {
+    await fetch('/api/lights/set', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({entity_id, ...params})
+    });
+  } catch(e) {}
+}
+
+function debounce(key, fn, ms=90) {
+  clearTimeout(timers[key]);
+  timers[key] = setTimeout(fn, ms);
+}
+
+// ── Actions ────────────────────────────────────────────────────────
+function allLights(on) {
+  LIGHTS.forEach(l => {
+    if(state[l.id]) { state[l.id].on = on; api(l.id, {on}); }
+  });
+  if(initialized) LIGHTS.forEach(l => syncCard(l.id));
+}
+
+function masterBri(val) {
+  debounce('mbri', () => {
+    LIGHTS.forEach(l => {
+      const s = state[l.id];
+      if(s && s.on && !(s.supported_color_modes||[]).every(m=>m==='onoff')) {
+        s.brightness = +val;
+        api(l.id, {on:true, brightness:+val});
+      }
+    });
+  });
+}
+
+function masterTemp(val) {
+  debounce('mtemp', () => {
+    LIGHTS.forEach(l => {
+      const s = state[l.id];
+      if(!s || !s.on) return;
+      const modes = s.supported_color_modes || [];
+      const hasTemp  = modes.includes('color_temp');
+      const hasColor = modes.includes('hs')||modes.includes('xy')||modes.includes('rgb');
+      if(hasTemp) {
+        s.color_temp_kelvin = +val;
+        api(l.id, {on:true, color_temp_kelvin:+val});
+      } else if(hasColor) {
+        const [h,sat] = kelvinToHs(+val);
+        s.hs_color = [h, sat];
+        api(l.id, {on:true, hs_color:[h,sat]});
+        updatePowerColor(l.id);
+      }
+    });
+  });
+}
+
+function masterHue(val) {
+  debounce('mhue', () => {
+    const hue = +val;
+    LIGHTS.forEach(l => {
+      const s = state[l.id];
+      if(!s || !s.on) return;
+      const modes = s.supported_color_modes || [];
+      if(modes.includes('hs')||modes.includes('xy')||modes.includes('rgb')) {
+        s.hs_color = [hue, 80];
+        s.rgb_color = null;
+        api(l.id, {on:true, hs_color:[hue, 80]});
+        updatePowerColor(l.id);
+      }
+    });
+  });
+}
+
+function toggle(id) {
+  const s = state[id]; if(!s) return;
+  s.on = !s.on;
+  api(id, {on: s.on});
+  syncCard(id);
+}
+
+function setBri(id, val) {
+  const s=state[id]; if(!s) return;
+  s.brightness = +val;
+  debounce(id+'b', () => api(id, {on:true, brightness:+val}));
+}
+
+function setHue(id, val) {
+  const s = state[id]; if(!s) return;
+  const hue = +val;
+  s.hs_color = [hue, 80];
+  s.rgb_color = null;
+  updatePowerColor(id);
+  debounce(id+'h', () => api(id, {on:true, hs_color:[hue, 80]}));
+}
+
+function setTemp(id, val) {
+  const s=state[id]; if(!s) return;
+  s.color_temp_kelvin = +val;
+  debounce(id+'t', () => api(id, {on:true, color_temp_kelvin:+val}));
+}
+
+// ── Render ─────────────────────────────────────────────────────────
+function sid(id) { return id.replace(/\./g,'_'); }
+function cardEl(id) { return document.getElementById('card-'+sid(id)); }
+
+function cardHtml(l) {
+  const s = state[l.id] || {on:false, supported_color_modes:['onoff']};
+  const modes = s.supported_color_modes || ['onoff'];
+  const isOnOff  = modes.every(m=>m==='onoff');
+  const hasColor = modes.includes('hs') || modes.includes('xy') || modes.includes('rgb');
+  const hasTemp  = modes.includes('color_temp');
+  const hasBri   = !isOnOff;
+  const hasBoth  = hasColor && hasTemp;
+  const bri  = s.brightness || 180;
+  const minK = s.min_color_temp_kelvin || 2000;
+  const maxK = s.max_color_temp_kelvin || 6500;
+  const curT = s.color_temp_kelvin || Math.round((minK+maxK)/2);
+  const hue  = currentHue(l.id);
+  const onCls = s.on ? ' on' : '';
+  const dis   = s.on ? '' : ' disabled';
+  const hex   = lightHex(s);
+
+  let glowStyle = '';
+  if(s.on && s.rgb_color) {
+    const [r,g,b] = s.rgb_color;
+    glowStyle = `style="border-color:rgba(${r},${g},${b},0.32);box-shadow:0 0 28px rgba(${r},${g},${b},0.1);"`;
+  } else if(s.on && hasTemp) {
+    glowStyle = `style="border-color:rgba(255,200,80,0.28);box-shadow:0 0 28px rgba(255,180,50,0.08);"`;
+  }
+
+  let colorSection = '';
+  if(hasBoth) {
+    colorSection = `
+  <div class="ctrl white-ctrl">
+    <span class="ctrl-label">Temperature</span>
+    <input type="range" class="temp-track" min="${minK}" max="${maxK}" value="${curT}"
+           oninput="setTemp('${l.id}',this.value)"${dis}>
+  </div>
+  <div class="ctrl colour-ctrl">
+    <span class="ctrl-label">Hue</span>
+    <input type="range" class="hue-track" min="0" max="360" value="${hue}"
+           oninput="setHue('${l.id}',this.value)"${dis}>
+  </div>`;
+  } else if(hasColor) {
+    colorSection = `
+  <div class="ctrl colour-ctrl">
+    <span class="ctrl-label">Hue</span>
+    <input type="range" class="hue-track" min="0" max="360" value="${hue}"
+           oninput="setHue('${l.id}',this.value)"${dis}>
+  </div>`;
+  } else if(hasTemp) {
+    colorSection = `
+  <div class="ctrl white-ctrl">
+    <span class="ctrl-label">Temperature</span>
+    <input type="range" class="temp-track" min="${minK}" max="${maxK}" value="${curT}"
+           oninput="setTemp('${l.id}',this.value)"${dis}>
+  </div>`;
+  }
+
+  return `<div class="card" id="card-${sid(l.id)}" ${glowStyle}>
+  <div class="card-top">
+    <span class="light-name">${l.name}</span>
+    <span class="dot${onCls}" id="dot-${sid(l.id)}"></span>
+  </div>
+  <div class="power-wrap">
+    <button class="power${onCls}" id="pw-${sid(l.id)}"
+            style="${s.on&&s.rgb_color?`color:${hex};border-color:${hex}55;box-shadow:0 0 22px ${hex}55;`:''}"
+            onclick="toggle('${l.id}')">⏻</button>
+  </div>
+  ${hasBri?`<div class="ctrl">
+    <span class="ctrl-label">Brightness</span>
+    <input type="range" class="bri-track" min="1" max="255" value="${bri}"
+           oninput="setBri('${l.id}',this.value)"${dis}>
+  </div>`:''}
+  ${colorSection}
+</div>`;
+}
+
+function renderGrid() {
+  document.getElementById('grid').innerHTML = LIGHTS.map(cardHtml).join('');
+}
+
+function syncCard(id) {
+  const s = state[id]; if(!s) return;
+  const card = cardEl(id); if(!card) return;
+  const onCls = s.on ? ' on' : '';
+  if(s.on && s.rgb_color) {
+    const [r,g,b]=s.rgb_color;
+    card.style.borderColor=`rgba(${r},${g},${b},0.32)`;
+    card.style.boxShadow=`0 0 28px rgba(${r},${g},${b},0.1)`;
+  } else if(s.on) {
+    card.style.borderColor='rgba(255,200,80,0.28)';
+    card.style.boxShadow='0 0 28px rgba(255,180,50,0.08)';
+  } else {
+    card.style.borderColor=''; card.style.boxShadow='';
+  }
+  const dot = document.getElementById('dot-'+sid(id));
+  if(dot) dot.className='dot'+onCls;
+  updatePowerColor(id);
+  card.querySelectorAll('input[type=range]').forEach(el => { el.disabled = !s.on; });
+}
+
+function updatePowerColor(id) {
+  const s=state[id]; if(!s) return;
+  const pw = document.getElementById('pw-'+sid(id)); if(!pw) return;
+  const hex = lightHex(s);
+  if(s.on) {
+    pw.className='power on';
+    if(s.rgb_color) pw.style.cssText=`color:${hex};border-color:${hex}55;box-shadow:0 0 22px ${hex}55;`;
+    else pw.style.cssText='';
+  } else {
+    pw.className='power'; pw.style.cssText='';
+  }
+}
+
+function setMixed(key, mixed) {
+  const el = document.getElementById('mixed-'+key);
+  if(el) el.style.opacity = mixed ? '1' : '0';
+}
+
+function syncMasterSliders() {
+  const allLights = LIGHTS.map(l => state[l.id]).filter(Boolean);
+  const onLights  = allLights.filter(s => s.on);
+
+  // Enable master sliders now that we have real state
+  ['master-bri','master-temp','master-hue'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.disabled = false;
+  });
+
+  const withBri = allLights.filter(s => s.brightness != null);
+  if(withBri.length) {
+    const avg = Math.round(withBri.reduce((a,s) => a+s.brightness, 0) / withBri.length);
+    document.getElementById('master-bri').value = avg;
+    setMixed('bri', withBri.length > 1 && withBri.some(s => Math.abs(s.brightness - avg) > 12));
+  }
+
+  const withTemp = allLights.filter(s => s.color_temp_kelvin != null);
+  if(withTemp.length) {
+    const avg = Math.round(withTemp.reduce((a,s) => a+s.color_temp_kelvin, 0) / withTemp.length);
+    document.getElementById('master-temp').value = avg;
+    setMixed('temp', withTemp.length > 1 && withTemp.some(s => Math.abs(s.color_temp_kelvin - avg) > 150));
+  }
+
+  const withHue = allLights.filter(s => s.hs_color != null);
+  if(withHue.length) {
+    const avg = Math.round(withHue.reduce((a,s) => a+s.hs_color[0], 0) / withHue.length);
+    document.getElementById('master-hue').value = avg;
+    setMixed('hue', withHue.length > 1 && withHue.some(s => Math.abs(s.hs_color[0] - avg) > 15));
+  }
+}
+
+// ── Init ───────────────────────────────────────────────────────────
+fetchState();
+setInterval(fetchState, 5000);
+</script>
+</body>
+</html>
