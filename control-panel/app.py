@@ -15,12 +15,12 @@ HA_TOKEN_F = os.path.expanduser("~/.config/homeassistant/token")
 CYCLE_PID  = "/tmp/wavy_lamp_cycle.pid"
 CYCLE_SCRIPT = os.path.join(os.path.dirname(__file__), "..", "tools", "wavy_lamp_cycle.py")
 
+# Keep in sync with the LIGHTS list in docker/hub/html/lights.html.
 ROOM_LIGHTS = [
-    {"entity_id": "light.room_light",                        "name": "Room Light"},
-    {"entity_id": "light.hall_bulb",                         "name": "Wavy Lamp"},
-    {"entity_id": "light.hall_light_strip_socket_1",         "name": "Hall Strip"},
-    {"entity_id": "light.a1_03900d641308170_chamber_light",  "name": "Chamber Light"},
-    {"entity_id": "light.wiz_rgbw_tunable_64d1fc",           "name": "Wiz Bulb"},
+    {"entity_id": "light.room_light",                "name": "Room Light", "room": "Bedroom"},
+    {"entity_id": "light.hall_bulb",                 "name": "Wavy Lamp",  "room": "Bedroom"},
+    {"entity_id": "light.wiz_rgbw_tunable_64d1fc",   "name": "Wiz Bulb",   "room": "Bedroom"},
+    {"entity_id": "light.hall_light_strip_socket_1", "name": "Hall Strip", "room": "Living Room"},
 ]
 
 
@@ -66,6 +66,7 @@ def lights_status():
         results.append({
             "entity_id": l["entity_id"],
             "name": l["name"],
+            "room": l.get("room"),
             "on": s.get("state") == "on",
             "brightness": a.get("brightness"),
             "rgb_color": a.get("rgb_color"),
