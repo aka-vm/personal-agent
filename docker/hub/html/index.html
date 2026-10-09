@@ -65,6 +65,31 @@
     <button onclick="escape(300,this)">5 min</button>
   </div>
 </div>
+<div class="sec">Automations</div>
+<div class="card" id="pr-card">
+  <div class="head">
+    <span class="dot" id="pr-dot"></span>
+    <span class="nm">💸 Payment Reminders</span>
+    <span class="state" id="pr-state">loading…</span>
+  </div>
+  <div class="row" style="margin-bottom:10px">
+    <button id="pr-toggle" onclick="prToggle(this)">…</button>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:.85rem">
+    <label style="color:var(--mut)">Low threshold (₹)</label>
+    <label style="color:var(--mut)">High threshold (₹)</label>
+    <input id="pr-tlow"  class="sel" type="number" step="500">
+    <input id="pr-thigh" class="sel" type="number" step="500">
+    <label style="color:var(--mut)">Remind every (low, days)</label>
+    <label style="color:var(--mut)">Remind every (high, days)</label>
+    <input id="pr-ilow"  class="sel" type="number" min="1">
+    <input id="pr-ihigh" class="sel" type="number" min="1">
+    <label style="color:var(--mut)">Active from day of month</label>
+    <span></span>
+    <input id="pr-sday"  class="sel" type="number" min="1" max="28">
+  </div>
+  <button onclick="prSave(this)" style="width:100%;margin-top:10px">Save settings</button>
+</div>
 <div id="apps"></div>
 
 <div class="foot"><b>Open</b> launches the service on your tailnet. <b>Stop optional</b> idles
@@ -127,10 +152,45 @@ async function escape(delay, btn){
   btn.disabled = false; btn.textContent = t;
 }
 
+// Payment reminders card
+async function prLoad(){
+  const c = await (await fetch('/api/payment-reminders')).json();
+  document.getElementById('pr-dot').className = 'dot ' + (c.enabled ? 'up' : 'down');
+  document.getElementById('pr-state').textContent = c.enabled ? 'enabled' : 'disabled';
+  document.getElementById('pr-toggle').textContent = c.enabled ? 'Disable' : 'Enable';
+  document.getElementById('pr-toggle').className = c.enabled ? 'red' : 'green';
+  document.getElementById('pr-tlow').value  = c.threshold_low;
+  document.getElementById('pr-thigh').value = c.threshold_high;
+  document.getElementById('pr-ilow').value  = c.interval_low;
+  document.getElementById('pr-ihigh').value = c.interval_high;
+  document.getElementById('pr-sday').value  = c.start_day;
+}
+async function prToggle(btn){
+  const cur = btn.textContent.trim() === 'Disable';
+  btn.disabled = true;
+  await fetch('/api/payment-reminders', {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({enabled: !cur})});
+  await prLoad(); btn.disabled = false;
+}
+async function prSave(btn){
+  const t = btn.textContent; btn.disabled = true; btn.textContent = 'Saving…';
+  await fetch('/api/payment-reminders', {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      threshold_low:  +document.getElementById('pr-tlow').value,
+      threshold_high: +document.getElementById('pr-thigh').value,
+      interval_low:   +document.getElementById('pr-ilow').value,
+      interval_high:  +document.getElementById('pr-ihigh').value,
+      start_day:      +document.getElementById('pr-sday').value,
+    })});
+  btn.textContent = 'Saved ✓'; setTimeout(()=>{ btn.textContent=t; btn.disabled=false; }, 1500);
+}
+prLoad();
+
 // Always-on static apps (served by Tailscale, not Docker — no start/stop).
 const APPS = [
   {label:'STFU', url:'https://vineet.werewolf-platy.ts.net:8443/', note:'mic playback, ~2s delay'},
   {label:'Encoder · Decoder', url:'https://vineet.werewolf-platy.ts.net:8444/', note:'encode / decode text'},
+  {label:'Room Lights', url:'/lights.html', note:'all lights · color · brightness'},
 ];
 function renderApps(){
   document.getElementById('apps').innerHTML = APPS.map(a => `<div class="card">

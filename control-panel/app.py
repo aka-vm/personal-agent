@@ -6,14 +6,11 @@ serves the dashboard and proxies /api/ here.
 Just service controls: status, per-service start/stop, and global start/stop of
 optional services (core stays up). No public sharing (ngrok removed).
 """
-import json, subprocess, os, base64, threading, html, urllib.request, urllib.parse, signal
+import json, subprocess, os, base64, threading, html, urllib.request, urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 HA_URL     = "http://localhost:8123"
-HA_ENTITY  = "light.hall_bulb"
 HA_TOKEN_F = os.path.expanduser("~/.config/homeassistant/token")
-CYCLE_PID  = "/tmp/wavy_lamp_cycle.pid"
-CYCLE_SCRIPT = os.path.join(os.path.dirname(__file__), "..", "tools", "wavy_lamp_cycle.py")
 
 # Keep in sync with the LIGHTS list in docker/hub/html/lights.html.
 ROOM_LIGHTS = [
@@ -40,21 +37,6 @@ def _ha(method, path, data=None):
         with urllib.request.urlopen(req, timeout=8) as r:
             return json.loads(r.read())
     except Exception:
-        return None
-
-
-def _cycle_pid():
-    if not os.path.exists(CYCLE_PID):
-        return None
-    pid = int(open(CYCLE_PID).read().strip())
-    try:
-        os.kill(pid, 0)
-        return pid
-    except ProcessLookupError:
-        try:
-            os.unlink(CYCLE_PID)
-        except FileNotFoundError:
-            pass
         return None
 
 
@@ -92,29 +74,6 @@ def set_light(entity_id, on, brightness=None, hs_color=None, color_temp_kelvin=N
         payload["color_temp_kelvin"] = int(color_temp_kelvin)
     _ha("POST", "/api/services/light/turn_on", payload)
 
-
-def _wavy_status():
-    state = _ha("GET", f"/api/states/{HA_ENTITY}") or {}
-    return {
-        "on":    state.get("state") == "on",
-        "cycle": _cycle_pid() is not None,
-    }
-
-
-def _wavy_power(on: bool):
-    svc = "turn_on" if on else "turn_off"
-    _ha("POST", f"/api/services/light/{svc}", {"entity_id": HA_ENTITY})
-
-
-def _wavy_cycle(on: bool):
-    if on:
-        if not _cycle_pid():
-            subprocess.Popen(["python3", os.path.abspath(CYCLE_SCRIPT), "start"],
-                             close_fds=True)
-    else:
-        pid = _cycle_pid()
-        if pid:
-            os.kill(pid, signal.SIGTERM)
 
 SECRETS_PATH = os.path.expanduser("~/.config/agent/secrets.env")
 PAYMENT_CFG_PATH = os.path.expanduser("~/.config/agent/payment_reminders_config.json")
@@ -251,8 +210,6 @@ class H(BaseHTTPRequestHandler):
             return self._j(200, status())
         if self.path == "/api/payment-reminders":
             return self._j(200, get_payment_cfg())
-        if self.path == "/api/wavy/status":
-            return self._j(200, _wavy_status())
         if self.path == "/api/lights":
             return self._j(200, lights_status())
         self._j(404, {})
@@ -275,16 +232,6 @@ class H(BaseHTTPRequestHandler):
                     cfg[k] = body[k]
             save_payment_cfg(cfg)
             return self._j(200, cfg)
-        if p == ["api", "wavy", "power"]:
-            n = int(self.headers.get("Content-Length", 0) or 0)
-            body = json.loads(self.rfile.read(n) or b"{}") if n else {}
-            _wavy_power(bool(body.get("on", True)))
-            return self._j(200, _wavy_status())
-        if p == ["api", "wavy", "cycle"]:
-            n = int(self.headers.get("Content-Length", 0) or 0)
-            body = json.loads(self.rfile.read(n) or b"{}") if n else {}
-            _wavy_cycle(bool(body.get("on", True)))
-            return self._j(200, {"ok": True})
         if p == ["api", "lights", "set"]:
             n = int(self.headers.get("Content-Length", 0) or 0)
             body = json.loads(self.rfile.read(n) or b"{}") if n else {}
