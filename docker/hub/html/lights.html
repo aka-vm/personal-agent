@@ -98,6 +98,18 @@ body {
 .mode-btn.active.white { background: rgba(255,230,160,0.18); color: #ffd87a; }
 .mode-btn.active.colour { background: rgba(120,80,255,0.22); color: #c4a0ff; }
 
+/* ── Room sections ── */
+.room-section { margin-bottom: 20px; }
+.room-heading {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  padding: 0 20px;
+  margin-bottom: 10px;
+}
+
 /* ── Grid ── */
 .grid {
   display: grid;
@@ -222,16 +234,20 @@ input[type=range]:not(:disabled):active::-webkit-slider-thumb { transform: scale
   </div>
 </div>
 
-<div class="grid" id="grid"></div>
+<div id="grid"></div>
 
 <script>
+// Hall Strip is always rendered last (see renderGrid). Add new bulbs here with their room;
+// everything else is grouped and ordered by room automatically.
 const LIGHTS = [
-  {id:'light.room_light', name:'Room Light'},
-  {id:'light.hall_bulb', name:'Wavy Lamp'},
-  {id:'light.hall_light_strip_socket_1', name:'Hall Strip'},
-  {id:'light.a1_03900d641308170_chamber_light', name:'Chamber Light'},
-  {id:'light.wiz_rgbw_tunable_64d1fc', name:'Wiz Bulb'},
+  {id:'light.room_light', name:'Room Light', room:'Bedroom'},
+  {id:'light.hall_bulb', name:'Wavy Lamp', room:'Bedroom'},
+  {id:'light.wiz_rgbw_tunable_64d1fc', name:'Wiz Bulb', room:'Bedroom'},
+  {id:'light.hall_light_strip_socket_1', name:'Hall Strip', room:'Living Room'},
 ];
+const HALL_STRIP_ID = 'light.hall_light_strip_socket_1';
+const COLOR_MODES = ['hs', 'xy', 'rgb', 'rgbw', 'rgbww'];
+function hasColorModes(modes) { return modes.some(m => COLOR_MODES.includes(m)); }
 
 let state = {};
 let timers = {};
@@ -274,7 +290,7 @@ function initMode(id) {
   const s = state[id];
   if(!s) return 'white';
   const modes = s.supported_color_modes || [];
-  const hasColor = modes.includes('hs') || modes.includes('xy') || modes.includes('rgb');
+  const hasColor = hasColorModes(modes);
   const hasTemp  = modes.includes('color_temp');
   if(!hasColor) return 'white';
   if(!hasTemp)  return 'colour';
@@ -348,7 +364,7 @@ function masterTemp(val) {
       if(!s || !s.on) return;
       const modes = s.supported_color_modes || [];
       const hasTemp  = modes.includes('color_temp');
-      const hasColor = modes.includes('hs')||modes.includes('xy')||modes.includes('rgb');
+      const hasColor = hasColorModes(modes);
       if(hasTemp) {
         s.color_temp_kelvin = +val;
         api(l.id, {on:true, color_temp_kelvin:+val});
@@ -369,7 +385,7 @@ function masterHue(val) {
       const s = state[l.id];
       if(!s || !s.on) return;
       const modes = s.supported_color_modes || [];
-      if(modes.includes('hs')||modes.includes('xy')||modes.includes('rgb')) {
+      if(hasColorModes(modes)) {
         s.hs_color = [hue, 80];
         s.rgb_color = null;
         api(l.id, {on:true, hs_color:[hue, 80]});
@@ -415,7 +431,7 @@ function cardHtml(l) {
   const s = state[l.id] || {on:false, supported_color_modes:['onoff']};
   const modes = s.supported_color_modes || ['onoff'];
   const isOnOff  = modes.every(m=>m==='onoff');
-  const hasColor = modes.includes('hs') || modes.includes('xy') || modes.includes('rgb');
+  const hasColor = hasColorModes(modes);
   const hasTemp  = modes.includes('color_temp');
   const hasBri   = !isOnOff;
   const hasBoth  = hasColor && hasTemp;
@@ -484,8 +500,28 @@ function cardHtml(l) {
 </div>`;
 }
 
+function roomSectionHtml(room, lights) {
+  return `<div class="room-section">
+  <div class="room-heading">${room}</div>
+  <div class="grid">${lights.map(cardHtml).join('')}</div>
+</div>`;
+}
+
 function renderGrid() {
-  document.getElementById('grid').innerHTML = LIGHTS.map(cardHtml).join('');
+  const hallStrip = LIGHTS.find(l => l.id === HALL_STRIP_ID);
+  const rest = LIGHTS.filter(l => l.id !== HALL_STRIP_ID);
+
+  const roomOrder = [];
+  const roomMap = {};
+  rest.forEach(l => {
+    const room = l.room || 'Other';
+    if (!roomMap[room]) { roomMap[room] = []; roomOrder.push(room); }
+    roomMap[room].push(l);
+  });
+
+  let html = roomOrder.map(room => roomSectionHtml(room, roomMap[room])).join('');
+  if (hallStrip) html += roomSectionHtml(hallStrip.room || 'Other', [hallStrip]);
+  document.getElementById('grid').innerHTML = html;
 }
 
 function syncCard(id) {
